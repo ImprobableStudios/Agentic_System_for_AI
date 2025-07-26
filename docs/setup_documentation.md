@@ -17,8 +17,8 @@ This document provides instructions for setting up the Agentic AI System. The pr
 ### Manual Setup
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/agentic-ai-system.git
-cd agentic-ai-system
+git clone https://github.com/ImprobableStudios/Agentic_System_for_AI.git
+cd Agentic-System_for_AI
 
 # Run the setup script
 ./setup.sh
