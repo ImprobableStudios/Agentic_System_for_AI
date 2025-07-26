@@ -24,7 +24,7 @@ A production-ready, hybrid AI platform combining native Ollama for maximum GPU p
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/agentic-ai-system.git
+git clone https://github.com/ImprobableStudios/Agentic_System_for_AI.git
 cd agentic-ai-system
 
 # Run automated setup
@@ -44,15 +44,15 @@ The system uses a hybrid approach for optimal performance:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                Mac Studio M3 Ultra                   │
-│                                                      │
+│                Mac Studio M3 Ultra                  │
+│                                                     │
 │  Native Ollama (GPU/Metal)  ←→  Docker Services     │
-│                                  - LiteLLM Gateway   │
-│                                  - Open WebUI        │
-│                                  - PostgreSQL        │
-│                                  - Redis             │
-│                                  - Qdrant            │
-│                                  - Monitoring Stack  │
+│                                  - LiteLLM Gateway  │
+│                                  - Open WebUI       │
+│                                  - PostgreSQL       │
+│                                  - Redis            │
+│                                  - Qdrant           │
+│                                  - Monitoring Stack │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -113,7 +113,7 @@ After deployment, access:
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Open WebUI | http://localhost | AI Chat Interface |
+| Open WebUI | http://ai.local | AI Chat Interface |
 | n8n | http://n8n.local | Workflow Automation |
 | Grafana | http://grafana.local | Monitoring Dashboards |
 | Traefik | http://traefik.local | Proxy Dashboard |
@@ -155,13 +155,6 @@ curl http://localhost:4000/v1/completions \
 - **Secrets Management**: Environment-based configuration
 
 ## 🛠️ Maintenance
-
-### Daily Tasks
-```bash
-# Check system health
-docker-compose ps
-./scripts/check-health.sh
-```
 
 ### Backups
 ```bash
@@ -223,8 +216,6 @@ docker-compose ps
 4. Run tests
 5. Submit a pull request
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
 ## 📄 License
 
 This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
@@ -239,7 +230,6 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
 
 - GitHub Issues: Bug reports and feature requests
 - Discussions: Community help and questions
-- Email: support@your-domain.com
 
 ---
 
