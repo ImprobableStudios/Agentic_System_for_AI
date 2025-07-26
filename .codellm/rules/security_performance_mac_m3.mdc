@@ -1,0 +1,548 @@
+description: "Security and performance optimization for Mac M3 Ultra deployment"
+globs: ["docker-compose.yml", "config/**/*", "*.sh", ".env*", "scripts/**/*"]
+ruleType: performance
+---
+
+# Security & Performance Guidelines for Mac M3 Ultra
+
+## Mac M3 Ultra Optimization
+
+### Hardware Specifications
+- **CPU**: 24-core (16 performance + 8 efficiency cores)
+- **GPU**: 76-core GPU
+- **Neural Engine**: 32-core
+- **Memory**: 256GB unified memory
+- **Memory Bandwidth**: 800GB/s
+
+### Ollama Performance Optimization
+```bash
+# Optimal Ollama configuration for M3 Ultra
+export OLLAMA_NUM_THREADS=16          # Match performance cores
+export OLLAMA_FLASH_ATTENTION=1       # Enable Flash Attention
+export OLLAMA_KV_CACHE_TYPE="q8_0"   # Optimal cache quantization
+export OLLAMA_MAX_LOADED=2           # Balance memory vs switching
+export OLLAMA_GPU_OVERHEAD=0         # Use unified memory
+export OLLAMA_MAX_VRAM=0             # Unlimited unified memory
+export OLLAMA_PARALLEL=4             # Concurrent request handling
+```
+
+### Docker Desktop Configuration
+```json
+{
+  "cpus": 20,
+  "memory": 204800,  // 200GB in MB
+  "swap": 8192,      // 8GB swap
+  "disk": 409600,    // 400GB disk
+  "experimental": true,
+  "features": {
+    "buildkit": true
+  }
+}
+```
+
+## Service Resource Allocation
+
+### Memory Distribution Strategy
+```yaml
+# Total available: 256GB
+# Reserved for macOS: ~20GB
+# Reserved for Ollama: ~180GB (dynamic)
+# Available for Docker: ~56GB
+
+services:
+  postgresql:
+    deploy:
+      resources:
+        limits:
+          memory: 80G     # Database needs
+        reservations:
+          memory: 64G     # Guaranteed minimum
+  
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 32G     # Cache layer
+        reservations:
+          memory: 16G
+  
+  qdrant:
+    deploy:
+      resources:
+        limits:
+          memory: 16G     # Vector operations
+        reservations:
+          memory: 8G
+  
+  # Application services: ~20GB total
+  # Monitoring stack: ~10GB total
+```
+
+### CPU Allocation
+```yaml
+services:
+  litellm:
+    deploy:
+      resources:
+        limits:
+          cpus: '8'       # High concurrent load
+        reservations:
+          cpus: '4'
+  
+  postgresql:
+    deploy:
+      resources:
+        limits:
+          cpus: '6'       # Query processing
+        reservations:
+          cpus: '3'
+```
+
+## Security Architecture
+
+### Network Security
+
+#### Network Isolation
+```yaml
+networks:
+  agentic-ai-frontend:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-frontend
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+  
+  agentic-ai-backend:
+    driver: bridge
+    internal: true  # No external routing
+    driver_opts:
+      com.docker.network.bridge.name: br-backend
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+  
+  agentic-ai-data:
+    driver: bridge
+    internal: true  # Database isolation
+    driver_opts:
+      com.docker.network.bridge.name: br-data
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+```
+
+#### Firewall Rules
+```bash
+# Host firewall configuration (pf on macOS)
+# /etc/pf.conf additions
+
+# Block all incoming except specific ports
+block in all
+pass in proto tcp to any port 80   # HTTP (redirect to HTTPS)
+pass in proto tcp to any port 443  # HTTPS
+pass in proto tcp to any port 22   # SSH (restricted source)
+
+# Rate limiting
+pass in proto tcp to any port 443 keep state \
+  (max-src-conn 100, max-src-conn-rate 15/5)
+```
+
+### Authentication & Authorization
+
+#### Service Authentication Matrix
+| Service | Auth Method | Implementation |
+|---------|------------|----------------|
+| LiteLLM | API Key | Bearer token in header |
+| Open WebUI | User/Pass | Built-in user management |
+| PostgreSQL | User/Pass | MD5/SCRAM-SHA-256 |
+| Redis | Password | requirepass directive |
+| Traefik | Basic Auth | htpasswd |
+| Grafana | User/Pass + API Key | Native auth |
+| Prometheus | Basic Auth | htpasswd |
+
+#### Secret Management
+```bash
+# Generate secure secrets
+generate_secret() {
+  openssl rand -base64 32
+}
+
+# Secrets rotation schedule
+# - API Keys: 90 days
+# - Passwords: 180 days  
+# - Certificates: 365 days
+# - Encryption keys: Never (unless compromised)
+```
+
+### Data Encryption
+
+#### At Rest
+```yaml
+# PostgreSQL encryption
+postgresql:
+  environment:
+    - POSTGRES_INITDB_ARGS=--data-encryption=on
+  volumes:
+    - ./data/postgresql:/var/lib/postgresql/data:Z
+```
+
+#### In Transit
+```yaml
+# TLS configuration for all services
+traefik:
+  command:
+    - --entrypoints.websecure.address=:443
+    - --entrypoints.websecure.http.tls=true
+    - --entrypoints.websecure.http.tls.options=modern@file
+```
+
+### Security Headers
+```yaml
+# Traefik middleware configuration
+http:
+  middlewares:
+    security-headers:
+      headers:
+        customFrameOptionsValue: SAMEORIGIN
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: strict-origin-when-cross-origin
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow"
+          Server: ""  # Hide server info
+```
+
+## Performance Optimization
+
+### Database Optimization
+
+#### PostgreSQL Tuning
+```ini
+# postgresql.conf for M3 Ultra
+shared_buffers = 64GB
+effective_cache_size = 192GB
+maintenance_work_mem = 4GB
+work_mem = 1GB
+max_connections = 500
+max_worker_processes = 16
+max_parallel_workers = 12
+max_parallel_maintenance_workers = 8
+max_parallel_workers_per_gather = 8
+wal_buffers = 32MB
+checkpoint_completion_target = 0.9
+random_page_cost = 1.1  # SSD optimization
+effective_io_concurrency = 200
+max_wal_size = 16GB
+min_wal_size = 2GB
+```
+
+#### Redis Optimization
+```conf
+# redis.conf for high performance
+maxmemory 32gb
+maxmemory-policy allkeys-lru
+io-threads 8
+io-threads-do-reads yes
+tcp-backlog 511
+tcp-keepalive 300
+save ""  # Disable persistence for cache-only
+lazyfree-lazy-eviction yes
+lazyfree-lazy-expire yes
+```
+
+### Container Optimization
+
+#### Build Optimization
+```dockerfile
+# Multi-stage builds for smaller images
+FROM python:3.11-slim AS builder
+# Build dependencies
+RUN pip install --user -r requirements.txt
+
+FROM python:3.11-slim
+# Copy only runtime dependencies
+COPY --from=builder /root/.local /root/.local
+```
+
+#### Runtime Optimization
+```yaml
+services:
+  service-name:
+    # Reduce overhead
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run
+```
+
+### Network Performance
+
+#### TCP Optimization
+```bash
+# macOS network tuning
+sudo sysctl -w net.inet.tcp.mssdflt=1460
+sudo sysctl -w net.inet.tcp.win_scale_factor=8
+sudo sysctl -w kern.ipc.somaxconn=2048
+sudo sysctl -w net.inet.tcp.sendspace=1048576
+sudo sysctl -w net.inet.tcp.recvspace=1048576
+```
+
+#### Connection Pooling
+```yaml
+# Service connection pools
+litellm:
+  environment:
+    - DATABASE_POOL_SIZE=50
+    - DATABASE_MAX_OVERFLOW=100
+    - REDIS_POOL_SIZE=100
+    - HTTP_CONN_POOL_SIZE=100
+```
+
+## Monitoring & Alerting
+
+### Performance Metrics
+
+#### Key Performance Indicators
+```yaml
+# Prometheus alert rules
+groups:
+  - name: performance
+    rules:
+      - alert: HighModelLatency
+        expr: histogram_quantile(0.95, litellm_request_duration_seconds_bucket) > 2
+        for: 5m
+        annotations:
+          summary: "Model inference latency > 2s (p95)"
+      
+      - alert: HighMemoryPressure
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.1
+        for: 5m
+        annotations:
+          summary: "Available memory < 10%"
+      
+      - alert: DatabaseSlowQueries
+        expr: rate(pg_stat_statements_mean_exec_time_seconds[5m]) > 1
+        for: 5m
+        annotations:
+          summary: "Database queries averaging > 1s"
+```
+
+#### Resource Monitoring
+```promql
+# Critical metrics to track
+
+# Ollama GPU utilization
+metal_gpu_utilization_percent
+
+# Model loading time
+histogram_quantile(0.95, ollama_model_load_duration_seconds_bucket)
+
+# Token generation rate
+rate(ollama_tokens_generated_total[5m])
+
+# Cache hit ratio
+redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total)
+
+# Database connection saturation
+pg_stat_database_numbackends / pg_settings_max_connections
+```
+
+### Security Monitoring
+
+#### Audit Logging
+```yaml
+# Comprehensive audit configuration
+services:
+  traefik:
+    command:
+      - --accesslog=true
+      - --accesslog.format=json
+      - --accesslog.fields.headers.names.Authorization=drop
+    volumes:
+      - ./logs/access:/var/log/traefik
+```
+
+#### Security Alerts
+```yaml
+groups:
+  - name: security
+    rules:
+      - alert: UnauthorizedAccess
+        expr: sum(rate(traefik_entrypoint_requests_total{code="401"}[5m])) > 10
+        annotations:
+          summary: "High rate of 401 errors"
+      
+      - alert: PotentialDDoS
+        expr: sum(rate(traefik_entrypoint_requests_total[1m])) by (client_ip) > 1000
+        annotations:
+          summary: "Potential DDoS from {{ $labels.client_ip }}"
+```
+
+## Backup & Recovery
+
+### Backup Strategy
+```bash
+#!/bin/bash
+# Automated backup with performance optimization
+
+# Parallel backup jobs
+backup_postgresql() {
+  pg_dump -j 8 -Fd -f /backups/postgresql/$(date +%Y%m%d)
+}
+
+backup_redis() {
+  redis-cli BGSAVE
+  cp /data/redis/dump.rdb /backups/redis/$(date +%Y%m%d).rdb
+}
+
+# Run backups in parallel
+backup_postgresql &
+backup_redis &
+wait
+```
+
+### Recovery Time Objectives
+- **RTO**: < 1 hour for full system
+- **RPO**: < 15 minutes for critical data
+- **Backup Verification**: Daily automated restore tests
+
+## Scaling Guidelines
+
+### Vertical Scaling Limits
+```yaml
+# Maximum tested configurations
+services:
+  postgresql:
+    deploy:
+      resources:
+        limits:
+          memory: 128G  # Beyond this, diminishing returns
+  
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 64G   # Sufficient for most workloads
+```
+
+### Horizontal Scaling Preparation
+```yaml
+# Service configurations for future scaling
+services:
+  litellm:
+    environment:
+      - CLUSTER_MODE=true
+      - NODE_ID=${HOSTNAME}
+    deploy:
+      replicas: 1  # Increase when needed
+      update_config:
+        parallelism: 1
+        delay: 10s
+```
+
+## Maintenance Procedures
+
+### Performance Maintenance
+```bash
+# Weekly maintenance tasks
+#!/bin/bash
+
+# Analyze and vacuum PostgreSQL
+docker-compose exec postgresql vacuumdb --all --analyze-in-stages
+
+# Optimize Redis memory
+docker-compose exec redis redis-cli MEMORY DOCTOR
+
+# Clean Docker resources
+docker system prune -af --volumes --filter "until=168h"
+
+# Update Ollama models
+ollama pull qwen3:235b-a22b
+```
+
+### Security Maintenance
+```bash
+# Monthly security tasks
+#!/bin/bash
+
+# Update all containers
+docker-compose pull
+docker-compose up -d
+
+# Rotate secrets
+./scripts/rotate-secrets.sh
+
+# Security scan
+docker scout scan $(docker-compose images -q)
+
+# Review access logs
+./scripts/audit-access-logs.sh
+```
+
+## Troubleshooting Performance
+
+### Common Issues
+
+#### High Memory Usage
+```bash
+# Diagnose memory issues
+# 1. Check Ollama model memory
+ps aux | grep ollama
+
+# 2. Container memory usage
+docker stats --no-stream
+
+# 3. Memory pressure
+vm_stat | grep "Pages free"
+
+# Solutions:
+# - Reduce OLLAMA_MAX_LOADED
+# - Decrease service memory limits
+# - Enable swap for non-critical services
+```
+
+#### Slow Inference
+```bash
+# Diagnose inference performance
+# 1. Check GPU utilization
+sudo powermetrics --samplers gpu_power -i1000 -n5
+
+# 2. Model loading frequency
+docker-compose logs litellm | grep "model load"
+
+# 3. Token generation rate
+curl http://localhost:11434/api/ps
+
+# Solutions:
+# - Increase keep_alive time
+# - Use quantized models
+# - Enable flash attention
+```
+
+## Best Practices Summary
+
+### Security Checklist
+- [ ] All secrets in environment variables
+- [ ] Network isolation properly configured
+- [ ] Authentication enabled on all services
+- [ ] TLS/SSL for external communication
+- [ ] Regular security updates
+- [ ] Audit logging enabled
+- [ ] Backup encryption enabled
+
+### Performance Checklist
+- [ ] Ollama optimally configured
+- [ ] Database indexes created
+- [ ] Connection pooling enabled
+- [ ] Caching properly configured
+- [ ] Resource limits set appropriately
+- [ ] Monitoring alerts configured
+- [ ] Regular maintenance scheduled

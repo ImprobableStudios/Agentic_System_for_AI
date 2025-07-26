@@ -1,0 +1,83 @@
+
+metadata:
+  name: "Agentic AI System CodeLLM Rules"
+  version: "1.0.0"
+  description: "Comprehensive rules for maintaining the agentic AI system architecture, code quality, and Mac Studio M3 Ultra optimizations"
+  created: "2025-07-20"
+  target_platform: "Mac Studio M3 Ultra"
+  architecture: "Hybrid Native-Container"
+
+rules_files:
+  - name: "project_structure"
+    file: "project_structure.mdc"
+    description: "Project organization and structure standards"
+    scope: ["*"]
+    priority: 1
+    
+  - name: "code_quality"
+    file: "code_quality.mdc"
+    description: "Code quality standards and best practices"
+    scope: ["*.py", "*.sh", "*.js", "*.ts", "*.yaml", "*.yml", "*.md"]
+    priority: 2
+    
+  - name: "documentation_standards"
+    file: "documentation_standards.mdc"
+    description: "Documentation requirements and formatting"
+    scope: ["*.md", "docs/**/*"]
+    priority: 3
+    
+  - name: "architecture_guidelines"
+    file: "architecture_guidelines.mdc"
+    description: "Architecture patterns for native Ollama + containerized services"
+    scope: ["docker-compose.yml", "config/**/*", "*.sh", "docs/architecture*"]
+    priority: 4
+    
+  - name: "security_performance_mac_m3"
+    file: "security_performance_mac_m3.mdc"
+    description: "Security requirements and Mac Studio M3 Ultra performance standards"
+    scope: ["docker-compose.yml", "config/**/*", "*.sh", "docs/**/*"]
+    priority: 5
+    
+  - name: "development_workflow"
+    file: "development_workflow.mdc"
+    description: "Development workflow and maintenance procedures"
+    scope: ["*.sh", "scripts/**/*", "Makefile", "*.py"]
+    priority: 6
+
+application_context:
+  system_type: "Agentic AI System"
+  hardware: "Mac Studio M3 Ultra (256GB Unified Memory)"
+  architecture_pattern: "Hybrid Native-Container"
+  core_services:
+    native:
+      - "Ollama (AI Inference)"
+    containerized:
+      - "LiteLLM (API Gateway)"
+      - "PostgreSQL (Database)"
+      - "Redis (Cache)"
+      - "Qdrant (Vector Database)"
+      - "SearXNG (Search)"
+      - "n8n (Workflow)"
+      - "Open WebUI (Interface)"
+      - "Traefik (Reverse Proxy)"
+  
+  key_optimizations:
+    - "Apple Silicon native builds"
+    - "Unified memory utilization"
+    - "Metal Performance Shaders"
+    - "Network isolation"
+    - "Resource allocation strategy"
+
+enforcement_settings:
+  strict_mode: true
+  auto_apply: true
+  validation_required: true
+  performance_monitoring: true
+  security_scanning: true
+
+integration:
+  git_hooks: true
+  pre_commit_validation: true
+  documentation_sync: true
+  performance_benchmarking: true
+  security_auditing: true

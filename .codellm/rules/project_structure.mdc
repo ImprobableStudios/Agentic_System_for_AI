@@ -1,0 +1,446 @@
+description: "Project structure and organization guidelines"
+globs: ["**/*", ".*"]
+ruleType: always
+---
+
+# Project Structure Guidelines
+
+## Directory Organization
+
+### Root Level Structure
+```
+agentic-ai-system/
+├── docker-compose.yml          # Main service orchestration
+├── docker-compose.override.yml # Local development overrides
+├── .env.example               # Environment template
+├── .env                       # Local environment (git-ignored)
+├── .gitignore                 # Git ignore rules
+├── README.md                  # Project overview
+├── setup.sh                   # Automated setup script
+├── LICENSE                    # Project license
+├── CHANGELOG.md              # Version history
+└── credentials.txt           # Generated credentials (git-ignored)
+```
+
+### Configuration Directory
+```
+config/
+├── traefik/
+│   ├── traefik.yml           # Main Traefik configuration
+│   ├── dynamic/              # Dynamic configuration
+│   └── certs/                # SSL certificates
+├── litellm/
+│   └── config.yaml           # LiteLLM model configuration
+├── postgresql/
+│   ├── postgresql.conf       # PostgreSQL tuning
+│   └── init-scripts/         # Database initialization
+├── redis/
+│   └── redis.conf            # Redis configuration
+├── qdrant/
+│   └── config.yaml           # Qdrant settings
+├── searxng/
+│   └── settings.yml          # Search engine config
+├── prometheus/
+│   ├── prometheus.yml        # Scraping configuration
+│   └── alerts/               # Alert rules
+├── grafana/
+│   ├── grafana.ini           # Grafana settings
+│   ├── provisioning/         # Datasources and dashboards
+│   └── dashboards/           # Dashboard JSON files
+├── alertmanager/
+│   └── alertmanager.yml      # Alert routing
+├── loki/
+│   └── loki-config.yml       # Log aggregation config
+├── promtail/
+│   └── config.yml            # Log shipping config
+├── blackbox/
+│   └── blackbox.yml          # Endpoint monitoring
+└── n8n/
+    └── config.json           # Workflow engine config
+```
+
+### Data Directory
+```
+data/
+├── postgresql/               # Database files
+│   ├── base/
+│   ├── global/
+│   └── pg_wal/
+├── redis/                    # Cache persistence
+│   └── dump.rdb
+├── qdrant/                   # Vector storage
+│   ├── collections/
+│   └── raft_state.json
+├── open-webui/               # UI data
+│   ├── cache/
+│   ├── uploads/
+│   └── webui.db
+├── n8n/                      # Workflow data
+│   ├── database.sqlite
+│   └── binaryData/
+├── prometheus/               # Metrics storage
+│   ├── wal/
+│   └── chunks_head/
+├── grafana/                  # Dashboard data
+│   └── grafana.db
+├── loki/                     # Log storage
+│   └── chunks/
+├── alertmanager/             # Alert state
+│   ├── silences
+│   └── nflog
+└── traefik/                  # Dynamic certificates
+    └── acme.json
+```
+
+### Documentation Directory
+```
+docs/
+├── architecture_evaluation.md # System architecture
+├── implementation_plan.md     # Deployment guide
+├── setup_documentation.md     # Installation guide
+├── monitoring_guide.md        # Monitoring setup
+├── api/                       # API documentation
+│   ├── litellm-api.md
+│   └── openapi.yaml
+├── runbooks/                  # Operational procedures
+│   ├── incident-response.md
+│   ├── backup-restore.md
+│   └── scaling-guide.md
+└── diagrams/                  # Architecture diagrams
+    ├── system-overview.png
+    └── network-diagram.png
+```
+
+### Scripts Directory
+```
+scripts/
+├── setup/
+│   ├── install-prereqs.sh    # Prerequisite installation
+│   ├── configure-ollama.sh   # Ollama setup
+│   └── generate-secrets.sh   # Secret generation
+├── maintenance/
+│   ├── backup-all.sh         # Full system backup
+│   ├── clean-logs.sh         # Log cleanup
+│   ├── update-models.sh      # Model updates
+│   └── optimize-db.sh        # Database optimization
+├── monitoring/
+│   ├── check-health.sh       # Health verification
+│   ├── export-metrics.sh     # Metrics export
+│   └── generate-report.sh    # Status reports
+├── development/
+│   ├── run-tests.sh          # Test execution
+│   ├── lint-code.sh          # Code quality
+│   └── build-images.sh       # Image building
+└── utilities/
+    ├── logs-filtered.sh      # Log analysis
+    ├── port-check.sh         # Port availability
+    └── resource-usage.sh     # Resource monitoring
+```
+
+### Source Directory (if custom code)
+```
+src/
+├── extensions/               # Custom extensions
+│   ├── litellm-plugins/
+│   └── n8n-nodes/
+├── utilities/                # Helper scripts
+│   ├── model-loader/
+│   └── data-migrator/
+└── tests/                    # Test suites
+    ├── unit/
+    ├── integration/
+    └── e2e/
+```
+
+### Logs Directory
+```
+logs/
+├── services/                 # Service logs (optional)
+│   ├── litellm/
+│   ├── postgresql/
+│   └── redis/
+├── access/                   # Access logs
+│   └── traefik/
+└── audit/                    # Audit trails
+    └── security.log
+```
+
+### Backups Directory
+```
+backups/
+├── scheduled/                # Automated backups
+│   ├── daily/
+│   ├── weekly/
+│   └── monthly/
+├── manual/                   # Manual backups
+│   └── before-upgrade/
+└── exports/                  # Data exports
+    ├── postgresql/
+    └── configurations/
+```
+
+## File Naming Conventions
+
+### Configuration Files
+- Use lowercase with hyphens: `service-name.conf`
+- Environment specific: `postgresql-prod.conf`
+- Templates end with `.example` or `.template`
+
+### Scripts
+- Use lowercase with hyphens: `backup-database.sh`
+- Prefix with action: `install-`, `backup-`, `check-`
+- Make executable: `chmod +x script-name.sh`
+
+### Documentation
+- Use title case with hyphens: `Setup-Guide.md`
+- API docs: `API-ServiceName.md`
+- Runbooks: `Runbook-TaskName.md`
+
+### Docker Files
+- Main file: `docker-compose.yml`
+- Environment overrides: `docker-compose.{env}.yml`
+- Dockerfiles: `Dockerfile.{service}`
+
+## Environment Management
+
+### Environment Files
+```bash
+.env                 # Local development (git-ignored)
+.env.example         # Template with descriptions
+.env.production      # Production values (secure storage)
+.env.staging         # Staging environment
+.env.test           # Test environment
+```
+
+### Secret Management
+```
+secrets/             # Git-ignored directory
+├── certificates/    # SSL certificates
+├── keys/           # API keys
+└── passwords/      # Service passwords
+```
+
+## Git Structure
+
+### .gitignore Rules
+```gitignore
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Data directories
+data/
+logs/
+backups/
+
+# Secrets
+secrets/
+credentials.txt
+*.key
+*.pem
+*.crt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
+```
+
+### Branch Protection
+```yaml
+# .github/branch-protection.yml
+protection_rules:
+  main:
+    required_reviews: 2
+    dismiss_stale_reviews: true
+    require_code_owner_reviews: true
+    required_status_checks:
+      - continuous-integration
+      - security-scan
+```
+
+## Configuration Management
+
+### Service Configuration Hierarchy
+1. Default values in image
+2. Configuration files in `config/`
+3. Environment variables in `.env`
+4. Runtime overrides in `docker-compose.override.yml`
+
+### Configuration Templates
+```yaml
+# config/service/config.yml.template
+service:
+  host: ${SERVICE_HOST:-localhost}
+  port: ${SERVICE_PORT:-8080}
+  database:
+    url: postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}/${DB_NAME}
+```
+
+## Data Management
+
+### Persistent Data Rules
+- All persistent data in `data/` directory
+- Service-specific subdirectories
+- Regular backup schedule
+- Clear data retention policies
+
+### Temporary Data
+- Use Docker tmpfs for temporary files
+- Clear cache directories regularly
+- Log rotation enabled
+
+## Security Practices
+
+### File Permissions
+```bash
+# Configuration files (read-only)
+chmod 644 config/**/*.yml
+chmod 600 config/**/*secret*
+
+# Scripts (executable)
+chmod 755 scripts/**/*.sh
+
+# Data directories
+chmod 700 data/postgresql
+chmod 755 data/redis
+```
+
+### Sensitive Files
+- Never commit `.env` files
+- Use `.example` files for templates
+- Store secrets in environment variables
+- Rotate credentials regularly
+
+## Development Workflow
+
+### Local Development Structure
+```
+.local/              # Git-ignored local development
+├── overrides/       # Local config overrides
+├── test-data/       # Test datasets
+└── scratch/         # Temporary work
+```
+
+### Testing Structure
+```
+tests/
+├── fixtures/        # Test data
+├── unit/           # Unit tests
+├── integration/    # Integration tests
+├── e2e/           # End-to-end tests
+└── performance/    # Load tests
+```
+
+## Documentation Standards
+
+### README Structure
+1. Project title and description
+2. Quick start guide
+3. Prerequisites
+4. Installation steps
+5. Configuration options
+6. Usage examples
+7. Troubleshooting
+8. Contributing guidelines
+9. License information
+
+### Code Documentation
+- Inline comments for complex logic
+- Function/method documentation
+- API endpoint documentation
+- Configuration file comments
+
+## Monitoring and Logs
+
+### Log Organization
+- Centralized in Loki
+- Local fallback in `logs/`
+- Structured JSON format
+- Automatic rotation
+
+### Metrics Collection
+- Prometheus scraping targets
+- Service-specific exporters
+- Custom business metrics
+- Performance baselines
+
+## Backup Strategy
+
+### Backup Organization
+```bash
+backups/
+└── $(date +%Y)/
+    └── $(date +%m)/
+        └── $(date +%d)/
+            ├── postgresql-full.sql
+            ├── redis-snapshot.rdb
+            ├── configs.tar.gz
+            └── manifest.json
+```
+
+### Backup Retention
+- Daily: 7 days
+- Weekly: 4 weeks
+- Monthly: 12 months
+- Yearly: 3 years
+
+## Migration Management
+
+### Database Migrations
+```
+migrations/
+├── postgresql/
+│   ├── 001_initial_schema.sql
+│   ├── 002_add_indexes.sql
+│   └── 003_optimize_tables.sql
+└── versions.json
+```
+
+### Configuration Migrations
+- Version all configuration changes
+- Document breaking changes
+- Provide migration scripts
+- Test rollback procedures
+
+## Best Practices
+
+### 1. Organization
+- Keep related files together
+- Use clear, descriptive names
+- Maintain consistent structure
+- Document non-obvious choices
+
+### 2. Version Control
+- Commit configuration templates
+- Ignore environment-specific files
+- Use meaningful commit messages
+- Tag releases appropriately
+
+### 3. Security
+- Separate secrets from code
+- Use appropriate permissions
+- Audit access regularly
+- Encrypt sensitive data
+
+### 4. Maintenance
+- Regular cleanup schedules
+- Automated health checks
+- Performance monitoring
+- Capacity planning
+
+### 5. Documentation
+- Keep docs up-to-date
+- Include examples
+- Document decisions
+- Maintain runbooks

@@ -1,0 +1,329 @@
+description: "Architecture Guidelines for Native Ollama + Containerized Services"
+globs: ["docker-compose.yml", "config/**/*", "*.sh", "docs/architecture*"]
+ruleType: always
+---
+
+# Architecture Guidelines
+
+## Core Architecture Principles
+
+### Hybrid Native-Container Design
+- **Native Ollama**: Run Ollama natively on macOS for maximum GPU performance and unified memory access
+- **Containerized Services**: All supporting services in Docker for isolation and management
+- **Bridge Communication**: LiteLLM acts as bridge between containerized services and native Ollama
+- **Network Isolation**: Use dedicated Docker networks for security and performance
+
+### Mac Studio M3 Ultra Optimization Strategy
+```yaml
+# Resource allocation strategy for 256GB unified memory
+services:
+  postgresql:
+    deploy:
+      resources:
+        limits:
+          memory: 80G    # 31% of total memory for database
+        reservations:
+          memory: 64G
+  
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 32G    # 12.5% for caching layer
+        reservations:
+          memory: 16G
+  
+  qdrant:
+    deploy:
+      resources:
+        limits:
+          memory: 16G    # 6% for vector database
+        reservations:
+          memory: 8G
+```
+
+## Service Integration Patterns
+
+### Native Ollama Configuration
+```bash
+# Ollama environment optimizations for M3 Ultra
+export OLLAMA_FLASH_ATTENTION=1
+export OLLAMA_KV_CACHE_TYPE="q8_0"
+export OLLAMA_NUM_THREADS=16
+export OLLAMA_MAX_LOADED=2
+export OLLAMA_HOST=127.0.0.1:11434
+
+# Launch Ollama as background service
+brew services start ollama
+```
+
+### LiteLLM Bridge Configuration
+```yaml
+# LiteLLM connects containerized services to native Ollama
+litellm:
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  environment:
+    - OLLAMA_BASE_URL=http://host.docker.internal:11434
+  command: ["--config", "/app/config/config.yaml", "--port", "4000", "--num_workers", "8"]
+```
+
+### Network Architecture
+```yaml
+networks:
+  agentic-ai-frontend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+  
+  agentic-ai-backend:
+    driver: bridge
+    internal: true  # No external access
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+  
+  agentic-ai-data:
+    driver: bridge
+    internal: true  # Database isolation
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+  
+  agentic-ai-monitoring:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16
+```
+
+## Service Design Patterns
+
+### Health Check Implementation
+```yaml
+# All services must implement comprehensive health checks
+healthcheck:
+  test: ["CMD", "wget", "--spider", "-q", "http://localhost:PORT/health"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 60s
+```
+
+### Service Dependencies
+```yaml
+# Proper dependency ordering
+depends_on:
+  postgresql:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+```
+
+### Container Naming Convention
+- Use prefix: `agentic-`
+- Service name: lowercase, hyphenated
+- Example: `agentic-postgresql`, `agentic-litellm`
+
+## Data Persistence Strategy
+
+### Volume Mapping
+```yaml
+volumes:
+  # Configuration - read-only
+  - ./config/service-name:/etc/service:ro
+  
+  # Data - persistent
+  - ./data/service-name:/var/lib/service
+  
+  # Logs - optional local mapping
+  - ./logs/service-name:/var/log/service
+```
+
+### Backup Considerations
+- All stateful data in `./data/` directory
+- Configuration in `./config/` (version controlled)
+- Automated backup scripts in `./scripts/`
+
+## Security Architecture
+
+### Network Security Levels
+1. **Public Access** (via Traefik only)
+   - Open WebUI
+   - n8n (with auth)
+   - Monitoring dashboards (with auth)
+
+2. **Internal Only** (no external routing)
+   - PostgreSQL
+   - Redis
+   - Qdrant
+
+3. **Bridge Access** (host.docker.internal)
+   - LiteLLM → Ollama
+   - Prometheus → Host metrics
+
+### Authentication Patterns
+```yaml
+# Environment-based secrets
+environment:
+  - SERVICE_PASSWORD=${SERVICE_PASSWORD}
+  - API_KEY=${SERVICE_API_KEY}
+
+# Basic auth for web interfaces
+labels:
+  - "traefik.http.middlewares.service-auth.basicauth.users=${SERVICE_AUTH_USERS}"
+```
+
+## Performance Optimization
+
+### Service Resource Limits
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '4.0'      # Limit CPU cores
+      memory: 16G      # Hard memory limit
+    reservations:
+      cpus: '2.0'      # Reserved CPU cores
+      memory: 8G       # Reserved memory
+```
+
+### Database Connection Pooling
+- PostgreSQL: max_connections = 500
+- Application services: pool_size = 20-50
+- Monitoring services: pool_size = 5-10
+
+### Caching Strategy
+- Redis for application caching
+- LiteLLM response caching
+- PostgreSQL query result caching
+- CDN/Browser caching for static assets
+
+## Monitoring Integration
+
+### Required Metrics Endpoints
+- All services expose metrics on `/metrics`
+- Prometheus scraping enabled
+- Custom metrics for business logic
+
+### Logging Standards
+- JSON structured logging
+- Log levels: ERROR, WARN, INFO, DEBUG
+- Centralized in Loki via Promtail
+
+### Alert Integration
+```yaml
+# Service-specific alerts
+annotations:
+  service: "{{ $labels.service_name }}"
+  runbook: "https://docs/runbooks/{{ $labels.alertname }}"
+  dashboard: "https://grafana/d/{{ $labels.dashboard_id }}"
+```
+
+## Deployment Patterns
+
+### Rolling Updates
+```bash
+# Update single service with zero downtime
+docker-compose up -d --no-deps service-name
+
+# Update all services sequentially
+docker-compose up -d --no-recreate
+```
+
+### Rollback Strategy
+- Tag all production images
+- Keep previous version available
+- Document rollback procedures
+- Test rollback in staging
+
+### Scaling Patterns
+1. **Vertical**: Increase resource limits
+2. **Horizontal**: Multiple service instances
+3. **Sharding**: Distribute data/load
+4. **Caching**: Reduce backend load
+
+## Development Workflow
+
+### Local Development
+```yaml
+# Override for development
+services:
+  service-name:
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+    volumes:
+      - ./src:/app/src  # Hot reload
+```
+
+### Testing Strategy
+- Unit tests for business logic
+- Integration tests for API endpoints
+- Load tests for performance validation
+- Chaos testing for resilience
+
+### CI/CD Integration
+- Automated testing on commit
+- Build and push images
+- Deployment validation
+- Rollback on failure
+
+## Best Practices
+
+### 1. Service Design
+- Single responsibility principle
+- Stateless where possible
+- Horizontal scalability in mind
+- Graceful shutdown handling
+
+### 2. Configuration Management
+- Environment variables for secrets
+- Config files for complex settings
+- Version control for configurations
+- Documentation for all settings
+
+### 3. Error Handling
+- Exponential backoff for retries
+- Circuit breakers for external calls
+- Graceful degradation
+- Comprehensive error logging
+
+### 4. Observability
+- Structured logging
+- Distributed tracing ready
+- Business metrics exposed
+- SLI/SLO defined and monitored
+
+### 5. Security
+- Least privilege principle
+- Network segmentation
+- Regular security updates
+- Secrets rotation policy
+
+## Migration Guidelines
+
+### Adding New Services
+1. Define service in docker-compose.yml
+2. Configure health checks
+3. Set resource limits
+4. Add to appropriate network
+5. Configure monitoring
+6. Document in architecture
+
+### Removing Services
+1. Update dependent services
+2. Backup any data
+3. Remove from docker-compose
+4. Clean up volumes
+5. Update documentation
+6. Archive configurations
+
+### Updating Services
+1. Test in development
+2. Review breaking changes
+3. Plan migration path
+4. Update documentation
+5. Coordinate deployment
+6. Monitor post-deployment

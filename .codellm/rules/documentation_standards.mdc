@@ -1,0 +1,555 @@
+description: "Documentation standards and practices for the Agentic AI System"
+globs: ["**/*.md", "docs/**/*", "README*", "*.txt"]
+ruleType: always
+---
+
+# Documentation Standards
+
+## Documentation Principles
+
+### Core Guidelines
+1. **Clarity First**: Write for users who are new to the system
+2. **Actionable**: Include specific commands and examples
+3. **Current**: Keep synchronized with code changes
+4. **Comprehensive**: Cover common use cases and edge cases
+5. **Searchable**: Use clear headings and keywords
+
+### Audience Awareness
+- **Operators**: Focus on deployment, monitoring, troubleshooting
+- **Developers**: Include API details, architecture decisions
+- **End Users**: Emphasize UI navigation, feature usage
+- **Administrators**: Security, backup, maintenance procedures
+
+## Document Types
+
+### 1. Architecture Documentation
+```markdown
+# Component Name
+
+## Overview
+Brief description of the component's purpose and role in the system.
+
+## Architecture
+- Design decisions and rationale
+- Integration points with other components
+- Data flow diagrams
+- Network topology
+
+## Configuration
+- Required environment variables
+- Configuration file structure
+- Default values and ranges
+
+## Performance Characteristics
+- Resource requirements
+- Scaling considerations
+- Optimization opportunities
+
+## Security Considerations
+- Authentication methods
+- Network exposure
+- Data encryption
+```
+
+### 2. Setup Documentation
+```markdown
+# Setup Guide
+
+## Prerequisites
+- Hardware requirements
+- Software dependencies
+- Network requirements
+
+## Installation Steps
+1. Step-by-step instructions
+2. Verification commands
+3. Expected output examples
+
+## Configuration
+- Essential settings
+- Optional enhancements
+- Performance tuning
+
+## Troubleshooting
+- Common issues and solutions
+- Debug commands
+- Log locations
+```
+
+### 3. API Documentation
+```markdown
+# API Reference
+
+## Authentication
+- Authentication methods
+- Token management
+- Rate limiting
+
+## Endpoints
+
+### Endpoint Name
+- **Method**: GET/POST/PUT/DELETE
+- **Path**: `/api/v1/resource`
+- **Description**: What it does
+
+#### Request
+```json
+{
+  "field": "value"
+}
+```
+
+#### Response
+```json
+{
+  "status": "success",
+  "data": {}
+}
+```
+
+#### Error Codes
+- 400: Bad Request
+- 401: Unauthorized
+- 500: Server Error
+```
+
+### 4. Operational Runbooks
+```markdown
+# Runbook: Task Name
+
+## Purpose
+What this runbook accomplishes
+
+## When to Use
+- Trigger conditions
+- Scheduled execution
+- Emergency scenarios
+
+## Prerequisites
+- Required access
+- Tools needed
+- Safety checks
+
+## Procedure
+1. [ ] Step with verification
+2. [ ] Next step with command
+   ```bash
+   command --with-options
+   ```
+3. [ ] Validation step
+
+## Rollback
+Steps to undo changes if needed
+
+## Escalation
+When and how to escalate
+```
+
+## Markdown Standards
+
+### Formatting Guidelines
+```markdown
+# H1 - Document Title (one per document)
+
+## H2 - Major Sections
+
+### H3 - Subsections
+
+#### H4 - Detailed Topics (avoid deeper nesting)
+
+**Bold** for emphasis
+*Italic* for terms
+`code` for inline code
+***Critical*** for warnings
+
+- Unordered lists for options
+1. Ordered lists for procedures
+   - Nested items with proper indentation
+
+> Blockquotes for important notes
+
+| Column | Description |
+|--------|-------------|
+| Data   | Table cells |
+```
+
+### Code Blocks
+````markdown
+```bash
+# Shell commands with comments
+docker-compose up -d
+```
+
+```yaml
+# YAML configuration with syntax highlighting
+service:
+  key: value
+```
+
+```python
+# Python code with proper highlighting
+def function():
+    return "value"
+```
+````
+
+### Links and References
+```markdown
+[Link Text](https://example.com)
+[Internal Link](../other-doc.md)
+[Section Link](#heading-name)
+
+![Alt Text](images/diagram.png)
+
+[reference-style][1]
+[1]: https://example.com
+```
+
+## File Organization
+
+### Naming Conventions
+```
+# Good examples
+setup-guide.md
+api-reference.md
+troubleshooting-network-issues.md
+runbook-database-backup.md
+
+# Avoid
+setup.md          # Too generic
+APIReference.md   # Use kebab-case
+TROUBLESHOOTING.md # No all caps
+```
+
+### Directory Structure
+```
+docs/
+├── README.md                 # Documentation index
+├── getting-started/
+│   ├── installation.md
+│   ├── configuration.md
+│   └── first-steps.md
+├── architecture/
+│   ├── overview.md
+│   ├── components.md
+│   └── decisions/
+│       └── adr-001-hybrid-architecture.md
+├── operations/
+│   ├── monitoring.md
+│   ├── backup-restore.md
+│   └── troubleshooting.md
+├── development/
+│   ├── api-reference.md
+│   ├── contributing.md
+│   └── testing.md
+└── runbooks/
+    ├── incident-response.md
+    └── maintenance-tasks.md
+```
+
+## Content Guidelines
+
+### README Files
+```markdown
+# Project Name
+
+Short description (1-2 sentences).
+
+## Features
+- Key feature 1
+- Key feature 2
+
+## Quick Start
+```bash
+# One-line install
+curl -sSL install.sh | bash
+```
+
+## Documentation
+- [Installation Guide](docs/installation.md)
+- [User Guide](docs/user-guide.md)
+- [API Reference](docs/api-reference.md)
+
+## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## License
+[LICENSE](LICENSE)
+```
+
+### Configuration Documentation
+```yaml
+# config/service/config.yml
+# Service Configuration File
+# 
+# This file controls the behavior of the service.
+# All values can be overridden via environment variables.
+
+service:
+  # Host to bind to (default: localhost)
+  # Environment: SERVICE_HOST
+  host: ${SERVICE_HOST:-localhost}
+  
+  # Port to listen on (default: 8080)
+  # Environment: SERVICE_PORT
+  port: ${SERVICE_PORT:-8080}
+  
+  # Database connection settings
+  database:
+    # Connection string format: postgresql://user:pass@host:port/dbname
+    # Environment: DATABASE_URL
+    url: ${DATABASE_URL}
+    
+    # Connection pool size (default: 10, max: 100)
+    # Environment: DATABASE_POOL_SIZE
+    pool_size: ${DATABASE_POOL_SIZE:-10}
+```
+
+### Error Messages
+```markdown
+## Common Errors
+
+### Error: Connection refused to Ollama
+**Symptom**: LiteLLM cannot connect to Ollama service
+
+**Cause**: 
+- Ollama not running
+- Incorrect host configuration
+- Firewall blocking connection
+
+**Solution**:
+1. Verify Ollama is running:
+   ```bash
+   brew services list | grep ollama
+   ```
+2. Check Ollama accessibility:
+   ```bash
+   curl http://localhost:11434/api/tags
+   ```
+3. Verify LiteLLM configuration:
+   ```bash
+   docker-compose exec litellm cat /app/config/config.yaml
+   ```
+```
+
+## Version Documentation
+
+### Changelog Format
+```markdown
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/),
+and this project adheres to [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+## [1.2.0] - 2024-01-15
+
+### Added
+- New feature with reference (#123)
+- Another feature (#124)
+
+### Changed
+- Updated behavior (#125)
+
+### Deprecated
+- Old feature (removal in 2.0.0)
+
+### Removed
+- Obsolete functionality (#126)
+
+### Fixed
+- Bug description (#127)
+
+### Security
+- Security patch for CVE-2024-XXXX
+```
+
+### Migration Guides
+```markdown
+# Migration Guide: v1.x to v2.x
+
+## Breaking Changes
+
+### Database Schema
+The user table structure has changed.
+
+**Before (v1.x)**:
+```sql
+CREATE TABLE users (
+    id INTEGER,
+    name TEXT
+);
+```
+
+**After (v2.x)**:
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TIMESTAMP
+);
+```
+
+**Migration Steps**:
+1. Backup your database
+2. Run migration script:
+   ```bash
+   ./scripts/migrate-v1-to-v2.sh
+   ```
+3. Verify data integrity
+```
+
+## Documentation Tools
+
+### Diagrams
+```markdown
+# Use Mermaid for diagrams
+
+```mermaid
+graph TD
+    A[User] --> B[Open WebUI]
+    B --> C[LiteLLM]
+    C --> D[Ollama]
+    C --> E[PostgreSQL]
+```
+```
+
+### API Documentation
+```yaml
+# OpenAPI specification
+openapi: 3.0.0
+info:
+  title: Agentic AI API
+  version: 1.0.0
+paths:
+  /v1/completions:
+    post:
+      summary: Generate completion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompletionRequest'
+```
+
+## Review Checklist
+
+### Before Publishing
+- [ ] Spell check completed
+- [ ] Links verified
+- [ ] Code examples tested
+- [ ] Screenshots updated
+- [ ] Version numbers correct
+- [ ] Commands executable
+- [ ] Cross-references valid
+
+### Quality Metrics
+- **Readability**: Grade 8-10 reading level
+- **Completeness**: All steps included
+- **Accuracy**: Commands work as written
+- **Currency**: Reflects latest version
+- **Accessibility**: Proper heading structure
+
+## Maintenance
+
+### Regular Updates
+- **Weekly**: Check for outdated commands
+- **Monthly**: Review troubleshooting sections
+- **Quarterly**: Update architecture diagrams
+- **Yearly**: Full documentation audit
+
+### Documentation Debt
+Track in issues with label `documentation`:
+- Missing documentation
+- Outdated sections
+- Unclear explanations
+- Broken links
+
+## Templates
+
+### Feature Documentation
+```markdown
+# Feature: [Name]
+
+## Overview
+What this feature does and why it's useful.
+
+## Prerequisites
+- Required setup
+- Dependencies
+
+## Configuration
+How to enable and configure the feature.
+
+## Usage
+Step-by-step guide with examples.
+
+## Best Practices
+Recommendations for optimal use.
+
+## Troubleshooting
+Common issues and solutions.
+
+## Related Features
+- [Link to related feature]
+```
+
+### Troubleshooting Template
+```markdown
+## Issue: [Problem Description]
+
+### Symptoms
+- What users see
+- Error messages
+- System behavior
+
+### Diagnosis
+1. Check this first
+2. Then verify this
+3. Look for these logs
+
+### Solutions
+#### Quick Fix
+Immediate workaround
+
+#### Permanent Solution
+Long-term resolution
+
+### Prevention
+How to avoid this issue
+
+### References
+- Related documentation
+- GitHub issues
+- External resources
+```
+
+## Best Practices
+
+### Writing Style
+1. **Active Voice**: "Configure the service" not "The service should be configured"
+2. **Present Tense**: "The system uses" not "The system will use"
+3. **Clear Instructions**: "Click Submit" not "You should click Submit"
+4. **Consistent Terms**: Use glossary for technical terms
+
+### Examples
+- **Include Many**: Show common use cases
+- **Test Them**: Ensure examples work
+- **Explain Output**: Show expected results
+- **Cover Edge Cases**: Document limitations
+
+### Accessibility
+- **Heading Structure**: Logical hierarchy
+- **Alt Text**: For all images
+- **Link Text**: Descriptive, not "click here"
+- **Color**: Don't rely solely on color
+
+### Internationalization
+- **Simple English**: Avoid idioms
+- **Cultural Neutral**: No region-specific references
+- **Date Formats**: Use ISO 8601
+- **Measurements**: Include metric and imperial

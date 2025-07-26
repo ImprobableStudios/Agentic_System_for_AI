@@ -1,0 +1,752 @@
+description: "Code quality standards and best practices for the Agentic AI System"
+globs: ["**/*.py", "**/*.js", "**/*.ts", "**/*.sh", "**/*.sql", "**/*.yml", "**/*.yaml"]
+ruleType: always
+---
+
+# Code Quality Standards
+
+## General Principles
+
+### Code Philosophy
+1. **Readability**: Code is read more often than written
+2. **Simplicity**: Prefer simple solutions over clever ones
+3. **Consistency**: Follow established patterns
+4. **Maintainability**: Consider future developers
+5. **Testability**: Design for testing from the start
+
+### Universal Standards
+- **Line Length**: Maximum 100 characters (80 preferred)
+- **Indentation**: 2 spaces for YAML/JSON, 4 spaces for Python/JS
+- **File Encoding**: UTF-8 without BOM
+- **Line Endings**: LF (Unix style)
+- **Trailing Whitespace**: None allowed
+- **File Naming**: lowercase with hyphens (kebab-case)
+
+## Language-Specific Standards
+
+### Python
+```python
+# PEP 8 compliant with type hints
+from typing import List, Dict, Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class ServiceManager:
+    """Manages service lifecycle and health checks.
+    
+    Attributes:
+        services: Dictionary of service names to service instances
+        health_check_interval: Seconds between health checks
+    """
+    
+    def __init__(self, health_check_interval: int = 30) -> None:
+        self.services: Dict[str, Service] = {}
+        self.health_check_interval = health_check_interval
+    
+    def add_service(self, name: str, service: Service) -> None:
+        """Add a service to be managed.
+        
+        Args:
+            name: Unique service identifier
+            service: Service instance to manage
+            
+        Raises:
+            ValueError: If service name already exists
+        """
+        if name in self.services:
+            raise ValueError(f"Service {name} already exists")
+        
+        self.services[name] = service
+        logger.info(f"Added service: {name}")
+```
+
+### Shell Scripts
+```bash
+#!/bin/bash
+# Script: deploy-service.sh
+# Purpose: Deploy a service with health checking
+# Usage: ./deploy-service.sh <service-name> [--check-health]
+
+set -euo pipefail  # Exit on error, undefined vars, pipe failures
+
+# Constants
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SERVICE_NAME="${1:-}"
+readonly CHECK_HEALTH="${2:-true}"
+readonly MAX_RETRIES=5
+readonly RETRY_DELAY=10
+
+# Functions
+log_info() {
+    echo "[INFO] $(date '+%Y-%m-%d %H:%M:%S') - $*" >&2
+}
+
+log_error() {
+    echo "[ERROR] $(date '+%Y-%m-%d %H:%M:%S') - $*" >&2
+}
+
+deploy_service() {
+    local service_name="$1"
+    
+    log_info "Deploying service: ${service_name}"
+    
+    if ! docker-compose up -d "${service_name}"; then
+        log_error "Failed to deploy ${service_name}"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Main
+main() {
+    if [[ -z "${SERVICE_NAME}" ]]; then
+        log_error "Usage: $0 <service-name> [--check-health]"
+        exit 1
+    fi
+    
+    deploy_service "${SERVICE_NAME}"
+}
+
+main "$@"
+```
+
+### YAML/Docker Compose
+```yaml
+# Service definition with best practices
+services:
+  service-name:
+    # Image versioning
+    image: service:${VERSION:-latest}
+    
+    # Container naming
+    container_name: ${PROJECT_NAME:-agentic}-service-name
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # Environment variables
+    environment:
+      # Use defaults with fallback
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DATABASE_URL=${DATABASE_URL}
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    
+    # Volumes
+    volumes:
+      - ./config:/etc/service:ro
+      - service-data:/var/lib/service
+    
+    # Networks
+    networks:
+      - backend
+      - monitoring
+    
+    # Dependencies
+    depends_on:
+      database:
+        condition: service_healthy
+    
+    # Labels
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9090"
+      - "com.example.service=api"
+```
+
+### SQL
+```sql
+-- Database schema with best practices
+-- Purpose: User management schema
+-- Version: 1.0.0
+
+-- Enable necessary extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Create schema
+CREATE SCHEMA IF NOT EXISTS auth;
+
+-- Set search path
+SET search_path TO auth, public;
+
+-- Users table with proper constraints
+CREATE TABLE IF NOT EXISTS users (
+    -- Primary key
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    
+    -- User attributes
+    email VARCHAR(255) NOT NULL,
+    username VARCHAR(50) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    
+    -- Metadata
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Status
+    is_active BOOLEAN DEFAULT true,
+    is_verified BOOLEAN DEFAULT false,
+    
+    -- Constraints
+    CONSTRAINT users_email_unique UNIQUE (email),
+    CONSTRAINT users_username_unique UNIQUE (username),
+    CONSTRAINT users_email_check CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$')
+);
+
+-- Indexes for performance
+CREATE INDEX idx_users_email ON users(email) WHERE is_active = true;
+CREATE INDEX idx_users_username ON users(username) WHERE is_active = true;
+CREATE INDEX idx_users_created_at ON users(created_at DESC);
+
+-- Audit trigger
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER users_update_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- Comments for documentation
+COMMENT ON TABLE users IS 'User accounts for authentication';
+COMMENT ON COLUMN users.email IS 'User email address (unique)';
+COMMENT ON COLUMN users.password_hash IS 'Bcrypt hashed password';
+```
+
+### JavaScript/TypeScript
+```typescript
+// TypeScript with strict typing and documentation
+import { Request, Response, NextFunction } from 'express';
+import { logger } from '../utils/logger';
+
+/**
+ * User service interface
+ */
+interface UserService {
+  findById(id: string): Promise<User | null>;
+  create(data: CreateUserDto): Promise<User>;
+  update(id: string, data: UpdateUserDto): Promise<User>;
+}
+
+/**
+ * User controller handling HTTP requests
+ */
+export class UserController {
+  constructor(private readonly userService: UserService) {}
+
+  /**
+   * Get user by ID
+   * @route GET /users/:id
+   */
+  async getUser(
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { id } = req.params;
+      
+      // Validate input
+      if (!isValidUuid(id)) {
+        res.status(400).json({ error: 'Invalid user ID format' });
+        return;
+      }
+      
+      // Fetch user
+      const user = await this.userService.findById(id);
+      
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      
+      // Return sanitized user data
+      res.json({
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        createdAt: user.createdAt,
+      });
+    } catch (error) {
+      logger.error('Error fetching user:', error);
+      next(error);
+    }
+  }
+}
+```
+
+## Configuration Files
+
+### Environment Variables
+```bash
+# .env.example - Environment configuration template
+# Copy to .env and fill in values
+
+# Application
+NODE_ENV=development
+LOG_LEVEL=info
+PORT=3000
+
+# Database
+DATABASE_URL=postgresql://user:pass@localhost:5432/dbname
+DATABASE_POOL_MIN=2
+DATABASE_POOL_MAX=10
+
+# Redis
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=
+
+# Security
+JWT_SECRET=change-me-in-production
+BCRYPT_ROUNDS=10
+SESSION_SECRET=change-me-in-production
+
+# External Services
+OPENAI_API_KEY=sk-...
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+```
+
+### JSON Configuration
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Service Configuration",
+  "type": "object",
+  "required": ["service", "database"],
+  "properties": {
+    "service": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Service identifier"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535,
+          "default": 8080
+        },
+        "workers": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 4
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "properties": {
+        "host": {"type": "string"},
+        "port": {"type": "integer"},
+        "name": {"type": "string"},
+        "pool": {
+          "type": "object",
+          "properties": {
+            "min": {"type": "integer", "default": 2},
+            "max": {"type": "integer", "default": 10}
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Testing Standards
+
+### Unit Tests
+```python
+# test_user_service.py
+import pytest
+from unittest.mock import Mock, patch
+from datetime import datetime
+from services.user_service import UserService
+from models.user import User
+
+class TestUserService:
+    """Test cases for UserService."""
+    
+    @pytest.fixture
+    def user_service(self):
+        """Create UserService instance with mocked dependencies."""
+        db = Mock()
+        cache = Mock()
+        return UserService(db=db, cache=cache)
+    
+    @pytest.fixture
+    def sample_user(self):
+        """Create sample user for testing."""
+        return User(
+            id="123e4567-e89b-12d3-a456-426614174000",
+            email="test@example.com",
+            username="testuser",
+            created_at=datetime.utcnow()
+        )
+    
+    def test_find_user_by_id_success(self, user_service, sample_user):
+        """Test successful user retrieval by ID."""
+        # Arrange
+        user_service.db.find_one.return_value = sample_user
+        
+        # Act
+        result = user_service.find_by_id(sample_user.id)
+        
+        # Assert
+        assert result == sample_user
+        user_service.db.find_one.assert_called_once_with(id=sample_user.id)
+    
+    def test_find_user_by_id_not_found(self, user_service):
+        """Test user not found scenario."""
+        # Arrange
+        user_service.db.find_one.return_value = None
+        
+        # Act
+        result = user_service.find_by_id("nonexistent-id")
+        
+        # Assert
+        assert result is None
+    
+    @pytest.mark.parametrize("email,expected", [
+        ("valid@example.com", True),
+        ("invalid-email", False),
+        ("", False),
+        (None, False),
+    ])
+    def test_email_validation(self, user_service, email, expected):
+        """Test email validation with various inputs."""
+        result = user_service.is_valid_email(email)
+        assert result == expected
+```
+
+### Integration Tests
+```bash
+#!/bin/bash
+# test-integration.sh - Run integration tests
+
+# Setup test environment
+export TEST_ENV=integration
+export DATABASE_URL=postgresql://test:test@localhost:5432/test_db
+
+# Start test containers
+docker-compose -f docker-compose.test.yml up -d
+
+# Wait for services
+./scripts/wait-for-services.sh
+
+# Run tests
+pytest tests/integration/ -v --cov=src --cov-report=html
+
+# Cleanup
+docker-compose -f docker-compose.test.yml down -v
+```
+
+## Error Handling
+
+### Error Response Format
+```json
+{
+  "error": {
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "User not found",
+    "details": {
+      "user_id": "123e4567-e89b-12d3-a456-426614174000"
+    },
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req-123456"
+  }
+}
+```
+
+### Error Handling Pattern
+```python
+class APIError(Exception):
+    """Base API exception class."""
+    
+    def __init__(
+        self,
+        message: str,
+        code: str,
+        status_code: int = 500,
+        details: Optional[Dict] = None
+    ):
+        super().__init__(message)
+        self.message = message
+        self.code = code
+        self.status_code = status_code
+        self.details = details or {}
+
+class ResourceNotFoundError(APIError):
+    """Resource not found exception."""
+    
+    def __init__(self, resource: str, id: str):
+        super().__init__(
+            message=f"{resource} not found",
+            code="RESOURCE_NOT_FOUND",
+            status_code=404,
+            details={"resource": resource, "id": id}
+        )
+```
+
+## Documentation
+
+### Code Comments
+```python
+def calculate_token_cost(
+    model: str,
+    input_tokens: int,
+    output_tokens: int
+) -> float:
+    """Calculate the cost of API token usage.
+    
+    Calculates cost based on model pricing and token counts.
+    Prices are cached for 1 hour to reduce API calls.
+    
+    Args:
+        model: Model identifier (e.g., 'gpt-4', 'gpt-3.5-turbo')
+        input_tokens: Number of input/prompt tokens
+        output_tokens: Number of generated tokens
+        
+    Returns:
+        Total cost in USD
+        
+    Raises:
+        ValueError: If model is not recognized
+        APIError: If pricing API is unavailable
+        
+    Example:
+        >>> cost = calculate_token_cost('gpt-4', 1000, 500)
+        >>> print(f"Cost: ${cost:.4f}")
+        Cost: $0.0450
+    """
+    # Implementation details...
+```
+
+### API Documentation
+```yaml
+# OpenAPI documentation
+/api/v1/users/{id}:
+  get:
+    summary: Get user by ID
+    description: Retrieve a single user by their unique identifier
+    operationId: getUser
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: User ID
+    responses:
+      '200':
+        description: User found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      '404':
+        description: User not found
+      '500':
+        description: Internal server error
+```
+
+## Code Review Checklist
+
+### Before Submitting PR
+- [ ] Code follows style guidelines
+- [ ] Self-review performed
+- [ ] Comments added for complex logic
+- [ ] Documentation updated
+- [ ] Tests added/updated
+- [ ] No secrets in code
+- [ ] Linting passes
+- [ ] Tests pass locally
+
+### Review Focus Areas
+1. **Logic**: Is the implementation correct?
+2. **Design**: Is the solution well-architected?
+3. **Performance**: Are there bottlenecks?
+4. **Security**: Are there vulnerabilities?
+5. **Maintainability**: Is it easy to understand?
+6. **Testing**: Is coverage adequate?
+
+## Performance Guidelines
+
+### Query Optimization
+```sql
+-- Use EXPLAIN ANALYZE for query planning
+EXPLAIN ANALYZE
+SELECT u.*, COUNT(p.id) as post_count
+FROM users u
+LEFT JOIN posts p ON p.user_id = u.id
+WHERE u.created_at > NOW() - INTERVAL '30 days'
+GROUP BY u.id
+LIMIT 100;
+
+-- Create appropriate indexes
+CREATE INDEX CONCURRENTLY idx_posts_user_id_created 
+ON posts(user_id, created_at DESC);
+```
+
+### Caching Strategy
+```python
+from functools import lru_cache
+from typing import Optional
+import redis
+
+class CacheService:
+    def __init__(self, redis_client: redis.Redis):
+        self.redis = redis_client
+        self.default_ttl = 3600  # 1 hour
+    
+    def get_or_set(
+        self,
+        key: str,
+        fetch_func: Callable,
+        ttl: Optional[int] = None
+    ) -> Any:
+        """Get from cache or fetch and set."""
+        # Try cache first
+        cached = self.redis.get(key)
+        if cached:
+            return json.loads(cached)
+        
+        # Fetch fresh data
+        data = fetch_func()
+        
+        # Cache for future
+        self.redis.setex(
+            key,
+            ttl or self.default_ttl,
+            json.dumps(data)
+        )
+        
+        return data
+```
+
+## Security Best Practices
+
+### Input Validation
+```python
+from pydantic import BaseModel, validator, EmailStr
+from typing import Optional
+
+class CreateUserDto(BaseModel):
+    email: EmailStr
+    username: str
+    password: str
+    
+    @validator('username')
+    def validate_username(cls, v):
+        if not v or len(v) < 3:
+            raise ValueError('Username must be at least 3 characters')
+        if not v.isalnum():
+            raise ValueError('Username must be alphanumeric')
+        return v.lower()
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        return v
+```
+
+### SQL Injection Prevention
+```python
+# Always use parameterized queries
+def get_user_posts(user_id: str, limit: int = 10):
+    query = """
+        SELECT * FROM posts 
+        WHERE user_id = %s 
+        ORDER BY created_at DESC 
+        LIMIT %s
+    """
+    return db.execute(query, (user_id, limit))
+```
+
+## Monitoring & Logging
+
+### Structured Logging
+```python
+import structlog
+
+logger = structlog.get_logger()
+
+def process_request(request_id: str, user_id: str, action: str):
+    log = logger.bind(
+        request_id=request_id,
+        user_id=user_id,
+        action=action
+    )
+    
+    log.info("Processing request")
+    
+    try:
+        result = perform_action(action)
+        log.info("Request completed", result=result)
+        return result
+    except Exception as e:
+        log.error("Request failed", error=str(e))
+        raise
+```
+
+### Metrics Collection
+```python
+from prometheus_client import Counter, Histogram, Gauge
+
+# Define metrics
+request_count = Counter(
+    'app_requests_total',
+    'Total number of requests',
+    ['method', 'endpoint', 'status']
+)
+
+request_duration = Histogram(
+    'app_request_duration_seconds',
+    'Request duration in seconds',
+    ['method', 'endpoint']
+)
+
+active_connections = Gauge(
+    'app_active_connections',
+    'Number of active connections'
+)
+```

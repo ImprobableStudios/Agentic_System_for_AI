@@ -1,0 +1,500 @@
+description: "Development workflow and practices for the Agentic AI System"
+globs: ["**/*.yml", "**/*.yaml", "**/*.sh", "scripts/**/*", ".env*"]
+ruleType: development
+---
+
+# Development Workflow Guidelines
+
+## Environment Setup
+
+### Prerequisites
+- Mac Studio M3 Ultra or equivalent Apple Silicon Mac
+- Docker Desktop for Mac (configured with 200GB RAM)
+- Homebrew package manager
+- Git with proper configuration
+- VS Code or preferred IDE
+
+### Initial Setup
+```bash
+# Clone repository
+git clone <repository-url>
+cd agentic-ai-system
+
+# Create environment file
+cp .env.example .env
+# Edit .env with your secure values
+
+# Install dependencies
+brew install ollama jq htpasswd
+
+# Start Ollama service
+brew services start ollama
+
+# Pull required models
+./scripts/pull-models.sh
+
+# Deploy services
+./setup.sh --dev-mode
+```
+
+## Development Practices
+
+### Branch Strategy
+```
+main (production-ready)
+├── develop (integration branch)
+├── feature/feature-name
+├── bugfix/issue-number
+├── hotfix/critical-fix
+└── release/version-number
+```
+
+### Commit Conventions
+```bash
+# Format: <type>(<scope>): <subject>
+
+# Types:
+feat: New feature
+fix: Bug fix
+docs: Documentation changes
+style: Code style changes
+refactor: Code refactoring
+perf: Performance improvements
+test: Test additions/changes
+chore: Build/auxiliary changes
+
+# Examples:
+feat(litellm): add GPT-4 model support
+fix(postgresql): resolve connection timeout issue
+docs(setup): update Mac M3 optimization guide
+perf(redis): optimize cache eviction policy
+```
+
+### Code Review Checklist
+- [ ] Follows architecture guidelines
+- [ ] Includes appropriate tests
+- [ ] Updates documentation
+- [ ] Adds monitoring/metrics
+- [ ] Handles errors gracefully
+- [ ] Considers security implications
+- [ ] Resource usage is optimized
+- [ ] Backwards compatible (or documented breaking changes)
+
+## Local Development
+
+### Service Development
+```yaml
+# docker-compose.override.yml for local development
+version: '3.8'
+services:
+  litellm:
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+    volumes:
+      - ./src/litellm:/app/src
+    command: ["--reload"]  # Hot reload
+
+  open-webui:
+    environment:
+      - WEBUI_ENV=development
+    ports:
+      - "3001:8080"  # Additional debug port
+```
+
+### Testing Workflow
+```bash
+# Run unit tests
+./scripts/test-unit.sh
+
+# Run integration tests
+./scripts/test-integration.sh
+
+# Run specific service tests
+docker-compose exec litellm pytest tests/
+
+# Load testing
+./scripts/load-test.sh --users 50 --duration 300
+
+# Security scanning
+./scripts/security-scan.sh
+```
+
+### Debugging Techniques
+
+#### Container Debugging
+```bash
+# Enter container shell
+docker-compose exec <service> bash
+
+# View real-time logs
+docker-compose logs -f <service>
+
+# Inspect container
+docker inspect agentic-<service>
+
+# Check resource usage
+docker stats agentic-<service>
+```
+
+#### Network Debugging
+```bash
+# Test connectivity between services
+docker-compose exec litellm ping postgresql
+
+# Check DNS resolution
+docker-compose exec litellm nslookup postgresql
+
+# Trace network path
+docker-compose exec litellm traceroute host.docker.internal
+```
+
+#### Performance Debugging
+```bash
+# Profile Python services
+docker-compose exec litellm python -m cProfile -o profile.out app.py
+
+# Monitor Ollama performance
+curl http://localhost:11434/api/show/modelname | jq .
+
+# Database query analysis
+docker-compose exec postgresql psql -U agentic_user -d agentic_ai -c "EXPLAIN ANALYZE <query>"
+```
+
+## Configuration Management
+
+### Environment Variables
+```bash
+# Development .env structure
+# Core Settings
+DOMAIN_NAME=local
+ENV=development
+
+# Service Passwords (generate unique ones)
+POSTGRES_PASSWORD=dev-password-change-me
+LITELLM_MASTER_KEY=sk-dev-$(openssl rand -hex 32)
+
+# Feature Flags
+ENABLE_DEBUG=true
+ENABLE_PROFILING=false
+ENABLE_TRACING=false
+
+# Resource Limits (reduced for dev)
+POSTGRES_MAX_CONNECTIONS=100
+REDIS_MAX_MEMORY=8gb
+```
+
+### Service Configuration Updates
+```bash
+# Validate configuration
+docker-compose config
+
+# Test configuration changes
+docker-compose up -d --no-deps <service>
+
+# Reload configuration without restart
+docker-compose exec <service> kill -HUP 1
+```
+
+## Testing Standards
+
+### Unit Testing
+```python
+# Test structure
+tests/
+├── unit/
+│   ├── test_models.py
+│   ├── test_utils.py
+│   └── test_api.py
+├── integration/
+│   ├── test_litellm_ollama.py
+│   └── test_database.py
+└── e2e/
+    └── test_user_flows.py
+
+# Example test
+def test_model_inference():
+    """Test model inference returns expected format."""
+    response = litellm.completion(
+        model="qwen3:235b-a22b",
+        messages=[{"role": "user", "content": "Hello"}]
+    )
+    assert response.choices[0].message.content
+    assert response.usage.total_tokens > 0
+```
+
+### Integration Testing
+```yaml
+# docker-compose.test.yml
+version: '3.8'
+services:
+  test-runner:
+    build: ./tests
+    depends_on:
+      - litellm
+      - postgresql
+      - redis
+    environment:
+      - TEST_ENV=integration
+    command: pytest -v tests/integration/
+```
+
+### Performance Testing
+```bash
+# Locust configuration for load testing
+# locustfile.py
+from locust import HttpUser, task, between
+
+class AIUser(HttpUser):
+    wait_time = between(1, 3)
+    
+    @task
+    def chat_completion(self):
+        self.client.post("/v1/completions", json={
+            "model": "qwen3:235b-a22b",
+            "prompt": "Test prompt",
+            "max_tokens": 100
+        })
+```
+
+## Monitoring Development
+
+### Custom Metrics
+```python
+# Add custom metrics to services
+from prometheus_client import Counter, Histogram, Gauge
+
+# Define metrics
+request_count = Counter('myapp_requests_total', 'Total requests')
+request_duration = Histogram('myapp_request_duration_seconds', 'Request duration')
+active_users = Gauge('myapp_active_users', 'Active users')
+
+# Use in code
+@request_duration.time()
+def process_request():
+    request_count.inc()
+    # Process logic
+```
+
+### Dashboard Development
+```json
+// Grafana dashboard template
+{
+  "dashboard": {
+    "title": "Service Metrics",
+    "panels": [
+      {
+        "title": "Request Rate",
+        "targets": [{
+          "expr": "rate(myapp_requests_total[5m])"
+        }]
+      }
+    ]
+  }
+}
+```
+
+## Deployment Process
+
+### Pre-deployment Checklist
+- [ ] All tests passing
+- [ ] Documentation updated
+- [ ] Migration scripts ready
+- [ ] Rollback plan documented
+- [ ] Monitoring alerts configured
+- [ ] Performance benchmarks met
+- [ ] Security scan passed
+- [ ] Change log updated
+
+### Deployment Steps
+```bash
+# 1. Tag release
+git tag -a v1.2.3 -m "Release version 1.2.3"
+git push origin v1.2.3
+
+# 2. Build images
+docker-compose build
+
+# 3. Run pre-deployment tests
+./scripts/pre-deploy-test.sh
+
+# 4. Backup current state
+./scripts/backup-all.sh
+
+# 5. Deploy services (rolling update)
+./scripts/deploy.sh --strategy rolling
+
+# 6. Run post-deployment tests
+./scripts/post-deploy-test.sh
+
+# 7. Monitor metrics
+./scripts/monitor-deployment.sh
+```
+
+### Rollback Procedure
+```bash
+# Quick rollback
+./scripts/rollback.sh --version previous
+
+# Manual rollback
+docker-compose down
+git checkout v1.2.2
+./setup.sh --skip-prereqs
+./scripts/restore-backup.sh --latest
+```
+
+## Troubleshooting Guide
+
+### Common Issues
+
+#### Service Won't Start
+```bash
+# Check logs
+docker-compose logs <service>
+
+# Verify dependencies
+docker-compose ps
+
+# Check resource availability
+docker system df
+df -h
+```
+
+#### Connection Issues
+```bash
+# Test network connectivity
+docker network ls
+docker network inspect agentic-ai-backend
+
+# Verify DNS
+docker-compose exec <service> cat /etc/resolv.conf
+```
+
+#### Performance Issues
+```bash
+# Check resource usage
+docker stats
+
+# Analyze slow queries
+docker-compose exec postgresql pg_stat_statements
+
+# Profile service
+docker-compose exec <service> py-spy top --pid 1
+```
+
+## Best Practices
+
+### 1. Code Quality
+- Use linters (pylint, eslint)
+- Format code consistently
+- Write self-documenting code
+- Add comprehensive comments
+- Follow language idioms
+
+### 2. Security Practices
+- Never commit secrets
+- Use environment variables
+- Implement input validation
+- Follow OWASP guidelines
+- Regular dependency updates
+
+### 3. Performance Optimization
+- Profile before optimizing
+- Cache expensive operations
+- Use connection pooling
+- Implement pagination
+- Monitor resource usage
+
+### 4. Documentation
+- Update README files
+- Document API changes
+- Include code examples
+- Maintain changelog
+- Create runbooks
+
+### 5. Collaboration
+- Small, focused PRs
+- Descriptive commit messages
+- Respond to reviews promptly
+- Share knowledge
+- Pair programming for complex tasks
+
+## Development Tools
+
+### Recommended VS Code Extensions
+```json
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-azuretools.vscode-docker",
+    "redhat.vscode-yaml",
+    "golang.go",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "eamodio.gitlens",
+    "humao.rest-client"
+  ]
+}
+```
+
+### Useful Scripts
+```bash
+# scripts/dev-setup.sh
+#!/bin/bash
+# Quick development environment setup
+
+# scripts/clean-logs.sh
+#!/bin/bash
+# Clean old logs and temporary files
+
+# scripts/sync-models.sh
+#!/bin/bash
+# Sync Ollama models between environments
+
+# scripts/generate-certs.sh
+#!/bin/bash
+# Generate self-signed certificates for local HTTPS
+```
+
+## Release Process
+
+### Version Numbering
+- Follow Semantic Versioning (SemVer)
+- MAJOR.MINOR.PATCH
+- Breaking changes increment MAJOR
+- New features increment MINOR
+- Bug fixes increment PATCH
+
+### Release Notes Template
+```markdown
+# Release v1.2.3
+
+## Features
+- Feature 1 description (#123)
+- Feature 2 description (#124)
+
+## Bug Fixes
+- Fix 1 description (#125)
+- Fix 2 description (#126)
+
+## Breaking Changes
+- Change 1 migration guide
+
+## Performance Improvements
+- Improvement 1 metrics
+
+## Security Updates
+- CVE-2024-XXXX patched
+
+## Contributors
+- @username1
+- @username2
+```
+
+### Post-Release Tasks
+- [ ] Update documentation site
+- [ ] Notify users of breaking changes
+- [ ] Update client libraries
+- [ ] Monitor error rates
+- [ ] Gather user feedback
+- [ ] Plan next iteration

@@ -1,0 +1,103 @@
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+api:
+  dashboard: true
+  debug: false
+  insecure: true
+
+entryPoints:
+  web:
+    address: ":80"
+    # Commenting out HTTPS redirect for local development
+    # http:
+    #   redirections:
+    #     entrypoint:
+    #       to: websecure
+    #       scheme: https
+    #       permanent: true
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        options: default
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: agentic_system_for_ai_agentic-ai-frontend
+    watch: true
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: admin@yourdomain.com
+      # TODO This should be on a mounted volume -- not in the local tmp.
+      storage: /tmp/acme.json
+      httpChallenge:
+        entryPoint: web
+      # Uncomment for DNS challenge if needed
+      # dnsChallenge:
+      #   provider: cloudflare
+      #   resolvers:
+      #     - "1.1.1.1:53"
+      #     - "8.8.8.8:53"
+
+log:
+  level: INFO
+  filePath: "/var/log/traefik.log"
+  format: json
+
+accessLog:
+  filePath: "/var/log/access.log"
+  format: json
+  bufferingSize: 100
+
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    addRoutersLabels: true
+    buckets:
+      - 0.1
+      - 0.3
+      - 1.2
+      - 5.0
+
+ping:
+  entryPoint: "traefik"
+
+# TLS Configuration
+tls:
+  options:
+    default:
+      sslStrategies:
+        - "tls.SniStrict"
+      minVersion: "VersionTLS12"
+      cipherSuites:
+        - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+        - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+        - "TLS_RSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_RSA_WITH_AES_128_GCM_SHA256"
+      curvePreferences:
+        - CurveP521
+        - CurveP384
+      sniStrict: true
+
+# Global HTTP configuration
+serversTransport:
+  insecureSkipVerify: false
+  rootCAs:
+    - /etc/ssl/certs/ca-certificates.crt
+  maxIdleConnsPerHost: 42
+  forwardingTimeouts:
+    dialTimeout: 30s
+    responseHeaderTimeout: 0s
+    idleConnTimeout: 90s

@@ -1,0 +1,78 @@
+global:
+  resolve_timeout: 5m
+  # SMTP configuration temporarily disabled to prevent authentication errors
+  # smtp_from: 'alertmanager@agentic-ai.local'
+  # smtp_smarthost: 'smtp.gmail.com:587'
+  # smtp_auth_username: '${ALERTMANAGER_EMAIL}'
+  # smtp_auth_password: '${ALERTMANAGER_EMAIL_PASSWORD}'
+  # smtp_require_tls: true
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'null-receiver'
+
+  routes:
+    # Critical alerts - disabled email notifications
+    - match:
+        severity: critical
+      receiver: 'null-receiver'
+      continue: true
+
+    # Warning alerts - disabled email notifications
+    - match:
+        severity: warning
+      receiver: 'null-receiver'
+
+    # Security alerts - disabled email notifications
+    - match:
+        alertname: TooManyFailedLogins
+      receiver: 'null-receiver'
+
+    # AI service alerts - disabled email notifications
+    - match_re:
+        service: (litellm|ollama|qdrant)
+      receiver: 'null-receiver'
+
+# Receivers
+receivers:
+  - name: 'null-receiver'
+    # No notifications configured - alerts will be logged but not sent
+    # To enable email notifications, configure SMTP settings in .env file:
+    # ALERTMANAGER_EMAIL=your-email@gmail.com
+    # ALERTMANAGER_EMAIL_PASSWORD=your-app-password
+    # Then uncomment and configure the email_configs below
+
+  # Example email configuration (requires valid SMTP credentials):
+  # - name: 'email-receiver'
+  #   email_configs:
+  #     - to: 'alerts@example.com'
+  #       from: 'alertmanager@agentic-ai.local'
+  #       smarthost: 'smtp.gmail.com:587'
+  #       auth_username: '${ALERTMANAGER_EMAIL}'
+  #       auth_password: '${ALERTMANAGER_EMAIL_PASSWORD}'
+  #       require_tls: true
+
+# Inhibition rules
+inhibit_rules:
+  # Inhibit warning alerts when critical alerts are firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+    
+  # Inhibit service alerts when node is down
+  - source_match:
+      alertname: 'ServiceDown'
+      job: 'node-exporter'
+    target_match_re:
+      alertname: '.*'
+    equal: ['instance']

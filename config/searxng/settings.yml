@@ -1,0 +1,490 @@
+
+# =============================================================================
+# SearXNG Configuration for Agentic AI System
+# =============================================================================
+# Optimized for secure, private web search capabilities
+
+# -----------------------------------------------------------------------------
+# GENERAL SETTINGS
+# -----------------------------------------------------------------------------
+general:
+  # Instance information
+  instance_name: "Agentic AI Search"
+  privacypolicy_url: false
+  donation_url: false
+  contact_url: false
+  
+  # Debug mode (disable in production)
+  debug: false
+  
+  # Enable metrics for monitoring
+  enable_metrics: true
+
+# -----------------------------------------------------------------------------
+# SEARCH CONFIGURATION
+# -----------------------------------------------------------------------------
+search:
+  # Safe search level (0=off, 1=moderate, 2=strict)
+  safe_search: 1
+  
+  # Autocomplete provider
+  autocomplete: "google"
+  autocomplete_min: 4
+  
+  # Default language
+  default_lang: "en"
+  
+  # Ban settings for failed engines
+  ban_time_on_fail: 5
+  max_ban_time_on_fail: 120
+  
+  # Supported result formats
+  formats:
+    - html
+    - json
+    - csv
+    - rss
+
+# -----------------------------------------------------------------------------
+# SERVER CONFIGURATION
+# -----------------------------------------------------------------------------
+server:
+  # Network settings
+  port: 8080
+  bind_address: "0.0.0.0"
+  
+  # Security
+  secret_key: "${SEARXNG_SECRET}"
+  
+  # Base URL (set to false for auto-detection)
+  base_url: false
+  
+  # Image proxy settings
+  image_proxy: true
+  
+  # HTTP protocol version
+  http_protocol_version: "1.1"
+  
+  # Default HTTP method
+  method: "POST"
+  
+  # Default HTTP headers for security
+  default_http_headers:
+    X-Content-Type-Options: nosniff
+    X-XSS-Protection: 1; mode=block
+    X-Download-Options: noopen
+    X-Robots-Tag: noindex, nofollow
+    Referrer-Policy: no-referrer
+    Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';"
+
+# -----------------------------------------------------------------------------
+# USER INTERFACE CONFIGURATION
+# -----------------------------------------------------------------------------
+ui:
+  # Static files optimization
+  static_use_hash: true
+  
+  # Default theme
+  default_theme: simple
+  
+  # Default locale
+  default_locale: en
+  
+  # Theme arguments
+  theme_args:
+    simple_style: auto
+    
+  # Results per page
+  results_per_page: 20
+  
+  # Infinite scroll
+  infinite_scroll: false
+  
+  # Center alignment
+  center_alignment: false
+  
+  # Cache static files
+  cache_static_files: true
+
+# -----------------------------------------------------------------------------
+# VALKEY/REDIS CONFIGURATION
+# -----------------------------------------------------------------------------
+valkey:
+  url: redis://agentic-redis:6379/1
+
+# -----------------------------------------------------------------------------
+# OUTGOING REQUEST CONFIGURATION
+# -----------------------------------------------------------------------------
+outgoing:
+  # Request timeout
+  request_timeout: 3.0
+  
+  # Maximum redirects
+  max_redirects: 5
+  
+  # User agent
+  useragent_suffix: "SearXNG/Agentic-AI"
+  
+  # Pool connections
+  pool_connections: 100
+  pool_maxsize: 20
+  
+  # Enable HTTP/2
+  enable_http2: true
+  
+  # Verify SSL certificates
+  verify: true
+  
+  # Retries
+  retries: 1
+  
+  # Soft timeout for search requests
+  soft_max_redirects: 3
+
+# -----------------------------------------------------------------------------
+# SEARCH ENGINE CONFIGURATION
+# -----------------------------------------------------------------------------
+engines:
+  # Google Search
+  - name: google
+    engine: google
+    shortcut: g
+    use_mobile_ui: false
+    disabled: false
+    timeout: 3.0
+    
+  # Bing Search
+  - name: bing
+    engine: bing
+    shortcut: b
+    disabled: false
+    timeout: 3.0
+    
+  # DuckDuckGo
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    disabled: false
+    timeout: 3.0
+    
+  # Wikipedia
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    base_url: 'https://{language}.wikipedia.org/'
+    disabled: false
+    timeout: 3.0
+    
+  # GitHub
+  - name: github
+    engine: github
+    shortcut: gh
+    disabled: false
+    timeout: 3.0
+    
+  # Stack Overflow (disabled - engine not available in current version)
+  # - name: stackoverflow
+  #   engine: stackoverflow
+  #   shortcut: so
+  #   disabled: false
+  #   timeout: 3.0
+    
+  # Reddit
+  - name: reddit
+    engine: reddit
+    shortcut: re
+    disabled: false
+    timeout: 3.0
+    
+  # Arxiv (for academic papers)
+  - name: arxiv
+    engine: arxiv
+    shortcut: arx
+    disabled: false
+    timeout: 3.0
+    
+  # YouTube
+  - name: youtube
+    engine: youtube_noapi
+    shortcut: yt
+    disabled: false
+    timeout: 3.0
+    
+  # News sources
+  - name: google news
+    engine: google_news
+    shortcut: gn
+    disabled: false
+    timeout: 3.0
+    
+  # Image search
+  - name: google images
+    engine: google_images
+    shortcut: gi
+    disabled: false
+    timeout: 3.0
+    
+  # Scholarly articles
+  - name: google scholar
+    engine: google_scholar
+    shortcut: gs
+    disabled: false
+    timeout: 3.0
+    
+  # Maps
+  - name: openstreetmap
+    engine: openstreetmap
+    shortcut: osm
+    disabled: false
+    timeout: 3.0
+
+# -----------------------------------------------------------------------------
+# CATEGORIES CONFIGURATION
+# -----------------------------------------------------------------------------
+categories_as_tabs:
+  general:
+    - google
+    - bing
+    - duckduckgo
+    - wikipedia
+  
+  images:
+    - google images
+    - bing images
+  
+  videos:
+    - youtube
+  
+  news:
+    - google news
+  
+  map:
+    - openstreetmap
+  
+  it:
+    - github
+    # - stackoverflow
+  
+  science:
+    - arxiv
+    - google scholar
+  
+  social media:
+    - reddit
+
+# -----------------------------------------------------------------------------
+# LOCALIZATION CONFIGURATION
+# -----------------------------------------------------------------------------
+locales:
+  en: English
+  de: Deutsch
+  fr: Français
+  es: Español
+  it: Italiano
+  ja: 日本語
+  zh: 中文
+  ru: Русский
+
+
+# -----------------------------------------------------------------------------
+# PLUGINS CONFIGURATION
+# -----------------------------------------------------------------------------
+plugins:
+  searx.plugins.calculator.SXNGPlugin:
+    active: true
+  searx.plugins.hash_plugin.SXNGPlugin:
+    active: true
+  searx.plugins.self_info.SXNGPlugin:
+    active: true
+  searx.plugins.tracker_url_remover.SXNGPlugin:
+    active: true
+  searx.plugins.unit_converter.SXNGPlugin:
+    active: true
+  searx.plugins.ahmia_filter.SXNGPlugin:
+    active: false
+
+# -----------------------------------------------------------------------------
+# DOI RESOLVER CONFIGURATION
+# -----------------------------------------------------------------------------
+default_doi_resolver: 'doi.org'
+doi_resolvers:
+  oadoi.org: 'https://oadoi.org/'
+  doi.org: 'https://doi.org/'
+  doai.io: 'https://doai.io/'
+  sci-hub.se: 'https://sci-hub.se/'
+
+# -----------------------------------------------------------------------------
+# DEFAULT QUERY SETTINGS
+# -----------------------------------------------------------------------------
+default_query_settings:
+  # Default search language
+  language: "en"
+  
+  # Default safe search
+  safesearch: 1
+  
+  # Default time range
+  time_range: ""
+  
+  # Default categories
+  categories: ["general"]
+
+# -----------------------------------------------------------------------------
+# RATE LIMITING CONFIGURATION
+# -----------------------------------------------------------------------------
+rate_limiting:
+  # Enable rate limiting
+  enable: true
+  
+  # Requests per minute per IP
+  requests_per_minute: 60
+  
+  # Burst allowance
+  burst: 10
+  
+  # Block duration for rate limit violations (seconds)
+  block_duration: 300
+
+# -----------------------------------------------------------------------------
+# SECURITY CONFIGURATION
+# -----------------------------------------------------------------------------
+security:
+  # Enable CSRF protection
+  csrf_protection: true
+  
+  # Enable XSS protection
+  xss_protection: true
+  
+  # Content type options
+  content_type_options: true
+  
+  # Frame options
+  frame_options: "DENY"
+  
+  # HSTS settings
+  hsts:
+    enabled: true
+    max_age: 31536000
+    include_subdomains: true
+    preload: true
+
+# -----------------------------------------------------------------------------
+# LOGGING CONFIGURATION
+# -----------------------------------------------------------------------------
+logging:
+  # Log level
+  level: INFO
+  
+  # Log format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # Log to file
+  filename: "/var/log/searxng.log"
+  
+  # Log rotation
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+# -----------------------------------------------------------------------------
+# PERFORMANCE OPTIMIZATION
+# -----------------------------------------------------------------------------
+performance:
+  # Enable caching
+  cache_enabled: true
+  
+  # Cache timeout (seconds)
+  cache_timeout: 300
+  
+  # Maximum cache size (MB)
+  max_cache_size: 100
+  
+  # Enable compression
+  compression_enabled: true
+  
+  # Connection pooling
+  connection_pool_size: 20
+  
+  # Request timeout
+  request_timeout: 5.0
+
+# -----------------------------------------------------------------------------
+# MONITORING AND METRICS
+# -----------------------------------------------------------------------------
+monitoring:
+  # Enable metrics endpoint
+  enable_metrics: true
+  
+  # Metrics endpoint path
+  metrics_path: "/metrics"
+  
+  # Health check endpoint
+  health_check_path: "/healthz"
+  
+  # Enable query logging
+  log_queries: false
+  
+  # Enable performance logging
+  log_performance: true
+
+# -----------------------------------------------------------------------------
+# AGENTIC AI SPECIFIC SETTINGS
+# -----------------------------------------------------------------------------
+agentic_ai:
+  # Custom result processing
+  enable_result_processing: true
+  
+  # AI-friendly result formatting
+  ai_result_format: true
+  
+  # Enhanced metadata extraction
+  extract_metadata: true
+  
+  # Content summarization hints
+  enable_summarization_hints: true
+  
+  # Structured data extraction
+  extract_structured_data: true
+  
+  # Custom headers for AI agents
+  ai_agent_headers:
+    X-AI-Agent: "Agentic-AI-System"
+    X-Search-Context: "AI-Assistant"
+
+# -----------------------------------------------------------------------------
+# CUSTOM RESULT PROCESSORS
+# -----------------------------------------------------------------------------
+result_processors:
+  # Remove tracking parameters
+  - name: "tracker_remover"
+    enabled: true
+    
+  # Extract structured data
+  - name: "structured_data_extractor"
+    enabled: true
+    
+  # Content summarization
+  - name: "content_summarizer"
+    enabled: false  # Requires additional setup
+    
+  # Duplicate removal
+  - name: "duplicate_remover"
+    enabled: true
+    similarity_threshold: 0.8
+
+# -----------------------------------------------------------------------------
+# WEBHOOK CONFIGURATION
+# -----------------------------------------------------------------------------
+webhooks:
+  # Search result webhooks
+  search_results:
+    enabled: false
+    url: "http://agentic-n8n:5678/webhook/search-results"
+    headers:
+      Authorization: "Bearer ${N8N_WEBHOOK_TOKEN}"
+  
+  # Error webhooks
+  errors:
+    enabled: false
+    url: "http://agentic-n8n:5678/webhook/search-errors"
+    headers:
+      Authorization: "Bearer ${N8N_WEBHOOK_TOKEN}"

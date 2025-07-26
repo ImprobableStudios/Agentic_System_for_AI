@@ -1,0 +1,572 @@
+services:
+  # Reverse Proxy and Load Balancer
+  traefik:
+    image: traefik:v3.0
+    container_name: agentic-traefik
+    restart: unless-stopped
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:8080:8080"  # Dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/traefik:/etc/traefik:ro
+      # TODO Temporarily removing certs volume due to mounting issue
+      # - traefik_certs:/etc/traefik/certs
+    networks:
+      - agentic-ai-frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.${DOMAIN_NAME:-local}`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Core Database Services
+  postgresql:
+    image: postgres:16-alpine
+    container_name: agentic-postgresql
+    restart: unless-stopped
+    environment:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+      POSTGRES_DB: ${POSTGRES_DB:-agentic_ai}
+      POSTGRES_USER: ${POSTGRES_USER:-agentic_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - ./data/postgresql:/var/lib/postgresql/data
+      - ./config/postgresql/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./config/postgresql/init-scripts:/docker-entrypoint-initdb.d:ro
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - agentic-ai-data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentic_user} -d ${POSTGRES_DB:-agentic_ai}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 80G
+        reservations:
+          memory: 64G
+
+  redis:
+    image: redis:7-alpine
+    container_name: agentic-redis
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./data/redis:/data
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - agentic-ai-data
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 32G
+        reservations:
+          memory: 16G
+
+  # AI Inference Layer
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: agentic-litellm
+    restart: unless-stopped
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-agentic_user}:${POSTGRES_PASSWORD}@agentic-postgresql:5432/${POSTGRES_DB:-agentic_ai}?schema=litellm
+      - REDIS_HOST=agentic-redis
+      - REDIS_PORT=6379
+      - LITELLM_LOG=INFO
+      - STORE_MODEL_IN_DB=True
+      - LITELLM_SALT_KEY=${LITELLM_MASTER_KEY}
+    volumes:
+      - ./config/litellm:/app/config:ro
+    command: ["--config", "/app/config/config.yaml", "--port", "4000", "--num_workers", "8"]
+    networks:
+      - agentic-ai-backend
+      - agentic-ai-data
+      - agentic-ai-frontend
+      - agentic-ai-monitoring
+    ports:
+      - "4000:4000"
+      - "127.0.0.1:4001:4001"  # Prometheus metrics port
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.litellm.rule=Host(`api.${DOMAIN_NAME:-local}`) || PathPrefix(`/v1/`)"
+      - "traefik.http.routers.litellm.service=litellm"
+      - "traefik.http.services.litellm.loadbalancer.server.port=4000"
+      - "traefik.http.routers.litellm.middlewares=litellm-ratelimit,security-headers@file"
+      - "traefik.http.middlewares.litellm-ratelimit.ratelimit.burst=100"
+      - "traefik.http.middlewares.litellm-ratelimit.ratelimit.average=60"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.connect(('localhost', 4000)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Vector Database and Search
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: agentic-qdrant
+    restart: unless-stopped
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+      - ./config/qdrant/config.yaml:/qdrant/config/production.yaml:ro
+    networks:
+      - agentic-ai-backend
+      - agentic-ai-frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.qdrant.rule=Host(`qdrant.${DOMAIN_NAME:-local}`)"
+      - "traefik.http.routers.qdrant.service=qdrant"
+      - "traefik.http.services.qdrant.loadbalancer.server.port=6333"
+      - "traefik.http.routers.qdrant.middlewares=qdrant-auth,security-headers@file"
+      - "traefik.http.middlewares.qdrant-auth.basicauth.users=${QDRANT_AUTH_USERS}"
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+        reservations:
+          memory: 8G
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: agentic-searxng
+    restart: unless-stopped
+    environment:
+      - SEARXNG_BASE_URL=https://search.${DOMAIN_NAME:-local}
+      - SEARXNG_SECRET=${SEARXNG_SECRET}
+    volumes:
+      - ./config/searxng:/etc/searxng:ro
+    networks:
+      - agentic-ai-frontend
+      - agentic-ai-data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.searxng.rule=Host(`search.${DOMAIN_NAME:-local}`)"
+      - "traefik.http.routers.searxng.service=searxng"
+      - "traefik.http.services.searxng.loadbalancer.server.port=8080"
+      - "traefik.http.routers.searxng.middlewares=searxng-ratelimit,security-headers@file"
+      - "traefik.http.middlewares.searxng-ratelimit.ratelimit.burst=50"
+      - "traefik.http.middlewares.searxng-ratelimit.ratelimit.average=30"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Application Services
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: agentic-n8n
+    restart: unless-stopped
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=agentic-postgresql
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-agentic_ai}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-agentic_user}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_AUTH_PASSWORD}
+      - WEBHOOK_URL=https://n8n.${DOMAIN_NAME:-local}
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - EXECUTIONS_PROCESS=main
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=agentic-redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_USER_MANAGEMENT_DISABLED=false
+      - N8N_PUBLIC_API_DISABLED=false
+      - N8N_DISABLE_PRODUCTION_MAIN_PROCESS=false
+      - N8N_SECURE_COOKIE=false
+    volumes:
+      - ./data/n8n:/home/node/.n8n
+    networks:
+      - agentic-ai-backend
+      - agentic-ai-data
+      - agentic-ai-frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.rule=Host(`n8n.${DOMAIN_NAME:-local}`)"
+      - "traefik.http.routers.n8n.service=n8n"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+      - "traefik.http.routers.n8n.entrypoints=web"
+      - "traefik.http.routers.n8n.middlewares=security-headers@file"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: agentic-open-webui
+    restart: unless-stopped
+    environment:
+      - OPENAI_API_BASE_URL=http://agentic-litellm:4000/v1
+      - OPENAI_API_KEY=${LITELLM_MASTER_KEY}
+      # - WEBUI_AUTH_TRUSTED_EMAIL_HEADER=Tailscale-User-Login
+      # - WEBUI_AUTH_TRUSTED_NAME_HEADER=Tailscale-User-Name
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      # TODO Temporarily commenting out DATABASE_URL due to OpenWebUI database initialization bug (15300)
+      # - DATABASE_URL=postgresql://${POSTGRES_USER:-agentic_user}:${POSTGRES_PASSWORD}@agentic-postgresql:5432/${POSTGRES_DB:-agentic_ai}
+      - DEFAULT_MODELS=qwen3:235b-a22b,mychen76/qwen3_cline_roocode:14b,mistral
+      - WEBUI_NAME=${WEBUI_NAME:-Agentic AI System}
+      - WEBUI_URL=http://ai.${DOMAIN_NAME:-local}
+      - ENABLE_COMMUNITY_SHARING=false
+      - ENABLE_MESSAGE_RATING=true
+      - ENABLE_MODEL_FILTER=true
+      - MODEL_FILTER_LIST=${MODEL_FILTER_LIST:-qwen3:235b-a22b;mychen76/qwen3_cline_roocode:14b;mistral}
+    volumes:
+      - ./data/open-webui:/app/backend/data
+    networks:
+      - agentic-ai-backend
+      - agentic-ai-data
+      - agentic-ai-frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webui.rule=Host(`ai.${DOMAIN_NAME:-local}`) || Host(`${DOMAIN_NAME:-localhost}`)"
+      - "traefik.http.routers.webui.entrypoints=web"
+      - "traefik.http.routers.webui.service=webui"
+      - "traefik.http.services.webui.loadbalancer.server.port=8080"
+      - "traefik.http.routers.webui.priority=100"
+      - "traefik.http.routers.webui.middlewares=security-headers@file"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      litellm:
+        condition: service_healthy
+      # TODO Temporarily removing PostgreSQL dependency due to OpenWebUI database initialization bug
+      # postgresql:
+      #   condition: service_healthy
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: agentic-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=50GB'
+    volumes:
+      - ./config/prometheus:/etc/prometheus:ro
+      - ./data/prometheus:/prometheus
+    networks:
+      - agentic-ai-monitoring
+      - agentic-ai-frontend
+      - agentic-ai-backend
+      - agentic-ai-data
+    ports:
+      - "127.0.0.1:9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN_NAME:-local}`)"
+      - "traefik.http.routers.prometheus.service=prometheus"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+      - "traefik.http.routers.prometheus.middlewares=prometheus-auth,security-headers@file"
+      - "traefik.http.middlewares.prometheus-auth.basicauth.users=${PROMETHEUS_AUTH_USERS}"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: agentic-grafana
+    restart: unless-stopped
+    environment:
+      - GF_INSTALL_PLUGINS=redis-datasource
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_DATABASE_TYPE=postgres
+      - GF_DATABASE_HOST=agentic-postgresql:5432
+      - GF_DATABASE_NAME=grafana
+      - GF_DATABASE_USER=${POSTGRES_USER:-agentic_user}
+      - GF_DATABASE_PASSWORD=${POSTGRES_PASSWORD}
+      - GF_DATABASE_SSL_MODE=disable
+      - GF_SESSION_PROVIDER=postgres
+      - GF_SESSION_PROVIDER_CONFIG=user=${POSTGRES_USER:-agentic_user} password=${POSTGRES_PASSWORD} host=agentic-postgresql port=5432 dbname=grafana sslmode=disable
+      - GF_SECURITY_SECRET_KEY=${GRAFANA_SECRET_KEY}
+      - GF_SERVER_DOMAIN=grafana.${DOMAIN_NAME:-local}
+      - GF_SMTP_USER=${ALERTMANAGER_EMAIL}
+      - GF_SMTP_PASSWORD=${ALERTMANAGER_EMAIL_PASSWORD}
+      - GF_LOG_FORMAT=console
+    volumes:
+      - ./config/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/etc/grafana/dashboards:ro
+      - ./data/grafana:/var/lib/grafana
+    networks:
+      - agentic-ai-monitoring
+      - agentic-ai-frontend
+      - agentic-ai-data
+    ports:
+      - "127.0.0.1:3000:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN_NAME:-local}`)"
+      - "traefik.http.routers.grafana.service=grafana"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      - "traefik.http.routers.grafana.middlewares=security-headers@file"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: agentic-alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://alertmanager.${DOMAIN_NAME:-local}'
+    volumes:
+      - ./config/alertmanager:/etc/alertmanager:ro
+      - ./data/alertmanager:/alertmanager
+    networks:
+      - agentic-ai-monitoring
+      - agentic-ai-frontend
+    ports:
+      - "127.0.0.1:9093:9093"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alertmanager.rule=Host(`alertmanager.${DOMAIN_NAME:-local}`)"
+      - "traefik.http.routers.alertmanager.service=alertmanager"
+      - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
+      - "traefik.http.routers.alertmanager.middlewares=alertmanager-auth,security-headers@file"
+      - "traefik.http.middlewares.alertmanager-auth.basicauth.users=${ALERTMANAGER_AUTH_USERS}"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Exporters for monitoring
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: agentic-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host:ro
+    networks:
+      - agentic-ai-monitoring
+    ports:
+      - "127.0.0.1:9100:9100"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:9100/metrics || exit 1"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 10s
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: agentic-postgres-exporter
+    restart: unless-stopped
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-agentic_user}:${POSTGRES_PASSWORD}@agentic-postgresql:5432/${POSTGRES_DB:-agentic_ai}?sslmode=disable
+      - PG_EXPORTER_AUTO_DISCOVER_DATABASES=true
+    networks:
+      - agentic-ai-monitoring
+      - agentic-ai-data
+    ports:
+      - "127.0.0.1:9187:9187"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9187/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: agentic-redis-exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis://agentic-redis:6379
+    networks:
+      - agentic-ai-monitoring
+      - agentic-ai-data
+    ports:
+      - "127.0.0.1:9121:9121"
+    healthcheck:
+      test: ["CMD", "/redis_exporter", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Blackbox Exporter - for probing HTTP endpoints
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.24.0
+    container_name: agentic-blackbox-exporter
+    restart: unless-stopped
+    volumes:
+      - ./config/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    command:
+      - '--config.file=/etc/blackbox_exporter/config.yml'
+    networks:
+      - agentic-ai-monitoring
+      - agentic-ai-frontend
+    ports:
+      - "127.0.0.1:9115:9115"
+    healthcheck:
+      test: ["CMD", "/bin/blackbox_exporter", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: agentic-cadvisor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - agentic-ai-monitoring
+    ports:
+      - "127.0.0.1:8081:8080"
+  loki:
+    image: grafana/loki:latest
+    container_name: agentic-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./data/loki:/loki
+      - ./config/loki:/etc/loki
+    networks:
+      - agentic-ai-monitoring
+      - agentic-ai-data
+    ports:
+      - "127.0.0.1:3100:3100"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: agentic-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./config/promtail:/etc/promtail:ro
+    networks:
+      - agentic-ai-monitoring
+    depends_on:
+      loki:
+        condition: service_healthy
+
+networks:
+  agentic-ai-backend:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+  agentic-ai-frontend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+  agentic-ai-data:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+  agentic-ai-monitoring:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16

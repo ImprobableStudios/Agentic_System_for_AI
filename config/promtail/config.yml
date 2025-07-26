@@ -1,0 +1,159 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # LiteLLM log processing and metrics generation
+  - job_name: litellm
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/agentic-litellm'
+        action: keep
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'
+      - source_labels: ['__meta_docker_container_name']
+        target_label: 'container'
+        regex: '/(.*)'
+        replacement: '$1'
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            model: model
+            total_tokens: total_tokens
+            prompt_tokens: prompt_tokens
+            completion_tokens: completion_tokens
+            response_time: request_time
+            status: status
+            end_time: end_time
+            litellm_call_id: litellm_call_id
+      - metrics:
+          litellm_requests_total:
+            type: Counter
+            description: "Total number of requests to LiteLLM"
+            source: status
+            config:
+              action: inc
+              match_all: true
+              labels:
+                model: model
+                status: status
+          litellm_request_duration_seconds:
+            type: Histogram
+            description: "Request latency to LiteLLM"
+            source: response_time
+            config:
+              buckets: [0.1, 0.5, 1, 2.5, 5, 10]
+              labels:
+                model: model
+          litellm_prompt_tokens_total:
+            type: Counter
+            description: "Total number of prompt tokens"
+            source: prompt_tokens
+            config:
+              action: add
+              match_all: true
+              labels:
+                model: model
+          litellm_completion_tokens_total:
+            type: Counter
+            description: "Total number of completion tokens"
+            source: completion_tokens
+            config:
+              action: add
+              match_all: true
+              labels:
+                model: model
+          litellm_total_tokens_total:
+            type: Counter
+            description: "Total number of tokens"
+            source: total_tokens
+            config:
+              action: add
+              match_all: true
+              labels:
+                model: model
+      - timestamp:
+          format: "2006-01-02T15:04:05.999Z"
+          source: end_time
+      - labels:
+          level:
+          model:
+          status:
+          litellm_call_id:
+
+  # Docker container logs
+  - job_name: containers
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: containerlogs
+          __path__: /var/lib/docker/containers/*/*log
+
+    pipeline_stages:
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            attrs:
+      - json:
+          expressions:
+            tag:
+          source: attrs
+      - regex:
+          expression: (?P<container_name>(?:[^|]*))\|(?P<image_name>(?:[^|]*))
+          source: tag
+      # Filter out Node Exporter connection reset errors
+      - drop:
+          expression: '(?i).*error encoding and sending metric family.*connection reset by peer.*'
+          source: output
+          drop_counter_reason: node_exporter_connection_reset
+      - timestamp:
+          format: RFC3339Nano
+          source: time
+      - labels:
+          stream:
+          container_name:
+          image_name:
+      - output:
+          source: output
+
+  # System logs
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          __path__: /var/log/syslog
+
+  # Application specific logs
+  - job_name: agentic-ai-apps
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: agentic-ai
+          __path__: /var/log/agentic-ai/*.log
+
+    pipeline_stages:
+      - multiline:
+          firstline: '^\d{4}-\d{2}-\d{2}'
+          max_wait_time: 3s
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<message>.*)'
+      - labels:
+          level:
+      - timestamp:
+          format: '2006-01-02 15:04:05'
+          source: timestamp
