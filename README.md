@@ -25,7 +25,7 @@ A production-ready, hybrid AI platform combining native Ollama for maximum GPU p
 ```bash
 # Clone the repository
 git clone https://github.com/ImprobableStudios/Agentic_System_for_AI.git
-cd agentic-ai-system
+cd Agentic_System_for_AI
 
 # Run automated setup
 ./setup.sh
