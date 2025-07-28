@@ -1,74 +1,118 @@
 # Agentic AI System
 
-A production-ready, hybrid AI platform combining native Ollama for maximum GPU performance with containerized services for enterprise-grade features. Optimized for Mac Studio M3 Ultra with 256GB unified memory.
+A production-ready, hybrid AI platform combining native Ollama for maximum GPU performance with containerized services for enterprise-grade features. Supports both Mac Studio (Apple Silicon) and Ubuntu Server (NVIDIA GPU) deployments.
 
 ## 🚀 Features
 
 - **Hybrid Architecture**: Native Ollama for GPU acceleration + Docker services for portability
-- **Multiple AI Models**: Qwen3 235B, Code-optimized models, embeddings, and OpenAI fallback
+- **Multi-Platform Support**: Optimized for Mac Studio M3 Ultra and Ubuntu Server with NVIDIA GPUs
+- **Multiple AI Models**: Platform-specific models with easy customization via configuration files
 - **Enterprise Ready**: Full monitoring, security, authentication, and backup capabilities
 - **Workflow Automation**: Built-in n8n for complex AI agent workflows
 - **Vector Search**: Qdrant database for semantic search and RAG applications
 - **Privacy Focused**: Self-hosted with SearXNG for private web search
-- **High Performance**: Optimized for Apple Silicon M3 Ultra architecture
+- **High Performance**: GPU-optimized for both Apple Silicon and NVIDIA architectures
 
 ## 📋 Prerequisites
 
-- Mac Studio M3 Ultra (or Apple Silicon Mac with 64GB+ RAM)
-- macOS Sonoma or later
-- Docker Desktop for Mac
-- 500GB+ available storage
-- Homebrew package manager
+### Mac Studio / Ubuntu Server
+- **Operating System**: macOS 14+ (Sonoma) or Ubuntu 24.04 LTS
+- **Memory**: 64GB RAM minimum (128GB+ recommended)
+- **Storage**: 1TB NVMe SSD minimum (2TB+ recommended)
+- **GPU**:
+    - **Mac**: M1/M2/M3 Ultra with maximum GPU cores
+    - **Ubuntu**: NVIDIA RTX 3090 / 4090 or higher, with appropriate drivers
+- **Software**:
+    - **macOS**: Homebrew, Docker Desktop with Colima
+    - **Ubuntu**: Docker, Docker Compose, NVIDIA Container Toolkit
+- **Connectivity**: Internet access for downloading models and dependencies
 
 ## 🚀 Quick Start
 
-```bash
-# Clone the repository
-git clone https://github.com/ImprobableStudios/Agentic_System_for_AI.git
-cd Agentic_System_for_AI
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/ImprobableStudios/Agentic_System_for_AI.git
+   cd Agentic_System_for_AI
+   ```
 
-# Run automated setup
-./setup.sh
-```
+2. **Run the setup script:**
+   This will install all prerequisites, configure the environment, and start all services.
+   ```bash
+   chmod +x setup.sh
+   ./setup.sh
+   ```
 
-The setup script will:
-1. Install required dependencies (Ollama, tools)
-2. Configure Docker Desktop resources
-3. Generate secure credentials
-4. Deploy all services
-5. Verify system health
+3. **Access the services:**
+   Once the setup is complete, you can access the various services via their respective URLs (e.g., `http://ai.local`, `http://n8n.local`). Refer to the `credentials.txt` file for initial login details.
+
+## 🔧 Configuration
+The system is highly configurable via the `.env` file and the configuration files in the `config` directory.
+
+- **`.env`**: Main environment variables, including domain names, passwords, and API keys.
+- **`config/models-mac.conf` / `config/models-linux.conf`**: Define the AI models to be used on each platform.
+- **`config/litellm/config.yaml`**: LiteLLM configuration for model routing and fallbacks.
+- **`docker-compose.yml`**: Defines all the containerized services and their configurations.
+
+## Architecture
+The system uses a hybrid architecture:
+- **Native Ollama**: Runs directly on the host OS to leverage maximum GPU performance for model inference.
+- **Dockerized Services**: All other components (databases, monitoring, applications) are containerized for portability and easy management.
+
+For a detailed architecture overview, see `docs/architecture_evaluation.md`.
+
+## 📄 License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🏗️ Architecture
 
 The system uses a hybrid approach for optimal performance:
 
+### Mac Studio Architecture
 ```
 ┌─────────────────────────────────────────────────────┐
 │                Mac Studio M3 Ultra                  │
+│         Unified Memory Architecture (256GB)         │
 │                                                     │
-│  Native Ollama (GPU/Metal)  ←→  Docker Services     │
-│                                  - LiteLLM Gateway  │
-│                                  - Open WebUI       │
-│                                  - PostgreSQL       │
-│                                  - Redis            │
-│                                  - Qdrant           │
-│                                  - Monitoring Stack │
+│  Native Ollama (Metal)  ←→  Docker Services         │
+│                            - LiteLLM Gateway        │
+│                            - Open WebUI             │
+│                            - PostgreSQL             │
+│                            - Redis                  │
+│                            - Qdrant                 │
+│                            - Monitoring Stack       │
+└─────────────────────────────────────────────────────┘
+```
+
+### Ubuntu Server Architecture
+```
+┌─────────────────────────────────────────────────────┐
+│              Ubuntu Server + NVIDIA GPU             │
+│      RTX PRO 6000 Blackwell (96GB GDDR7)            │
+│                                                     │
+│  Native Ollama (CUDA)  ←→  Docker Services          │
+│  24,064 CUDA Cores        - LiteLLM Gateway         │
+│  752 Tensor Cores         - Open WebUI              │
+│                           - PostgreSQL              │
+│                           - Redis                   │
+│                           - Qdrant                  │
+│                           - Monitoring Stack        │
 └─────────────────────────────────────────────────────┘
 ```
 
 ## 📦 Components
 
 ### AI Services
-- **Ollama**: Native GPU inference engine
+- **Ollama**: Native GPU inference engine (Metal for Mac, CUDA for NVIDIA)
 - **LiteLLM**: Unified API gateway with caching
 - **Open WebUI**: Modern chat interface
 - **Qdrant**: Vector database for embeddings
 
 ### Infrastructure
-- **PostgreSQL**: Primary database (80GB allocated)
-- **Redis**: High-performance caching (32GB)
+- **PostgreSQL**: Primary database
+- **Redis**: High-performance caching
 - **Traefik**: Reverse proxy with SSL support
 - **n8n**: Workflow automation platform
+- **SearXNG**: Private search engine
 
 ### Monitoring
 - **Prometheus**: Metrics collection
@@ -80,30 +124,33 @@ The system uses a hybrid approach for optimal performance:
 
 ### Environment Setup
 
-Create a `.env` file with your settings:
+The setup scripts automatically generate a `.env` file. To modify:
 
 ```bash
-# Copy template
-cp .env.example .env
-
-# Edit with your values
+# Edit configuration
 nano .env
 ```
 
 Key configurations:
 - `DOMAIN_NAME`: Your domain (default: local)
-- `POSTGRES_PASSWORD`: Strong database password
-- `LITELLM_MASTER_KEY`: API authentication key
-- OpenAI API key (optional, for fallback)
+- `POSTGRES_PASSWORD`: Database password (auto-generated)
+- `LITELLM_MASTER_KEY`: API authentication key (auto-generated)
+- `OPENAI_API_KEY`: OpenAI key for fallback (optional)
 
 ### Available Models
 
-The system comes pre-configured with:
-- `qwen3:235b-a22b` - Primary general-purpose model
-- `mychen76/qwen3_cline_roocode:14b` - Code generation
-- `mistral:7b` - Fast inference
-- `Qwen3-Embedding-8B` - Semantic search
-- `Qwen3-Reranker-8B` - Document ranking
+Models are configured per platform in:
+- **Mac Studio**: `config/models-mac.conf`
+- **Ubuntu/NVIDIA**: `config/models-linux.conf`
+
+Each platform includes:
+- Primary general-purpose model
+- Code-specialized model
+- Embedding model for vector operations
+- Reranking model for search optimization
+- Small model for quick tasks
+
+See [Model Configuration Guide](config/README.md) for customization instructions.
 
 ## 🖥️ Usage
 
@@ -114,9 +161,14 @@ After deployment, access:
 | Service | URL | Purpose |
 |---------|-----|---------|
 | Open WebUI | http://ai.local | AI Chat Interface |
+| LiteLLM API | http://api.local | Lightweight Language Model API |
 | n8n | http://n8n.local | Workflow Automation |
-| Grafana | http://grafana.local | Monitoring Dashboards |
+| SearXNG | http://search.local | Private Search |
 | Traefik | http://traefik.local | Proxy Dashboard |
+| Qdrant | http://qdrant.local | Vector Database |
+| Grafana | http://grafana.local | Monitoring Dashboards |
+| Prometheus | http://prometheus.local | Metrics Browser |
+| AlertManager | http://alertmanager.local | Alert Management |
 
 ### API Access
 
@@ -134,35 +186,50 @@ curl http://localhost:4000/v1/completions \
 
 ## 📊 Monitoring
 
+### GPU Monitoring
+
+**Mac Studio**:
+```bash
+# CPU/GPU usage via Activity Monitor
+# Power metrics
+sudo powermetrics --samplers gpu_power -i1000
+```
+
+**Ubuntu Server**:
+```bash
+# Real-time GPU monitoring
+nvidia-smi -l 1
+# Or use nvtop for better interface
+nvtop
+```
+
 ### Pre-configured Dashboards
 - System Overview
+- GPU Utilization (NVIDIA)
 - AI Service Metrics
 - Database Performance
 - Container Resources
-
-### Key Metrics
-- Model inference latency
-- Token generation rate
-- Cache hit ratios
-- Resource utilization
 
 ## 🔐 Security
 
 - **Network Isolation**: Four separate Docker networks
 - **Authentication**: Service-level auth on all endpoints
-- **Encryption**: TLS support via Traefik
+- **Firewall**: UFW configured (Ubuntu) / macOS firewall (Mac)
 - **Access Control**: Basic auth on admin interfaces
-- **Secrets Management**: Environment-based configuration
+- **Secrets Management**: Auto-generated, environment-based secure credentials
 
 ## 🛠️ Maintenance
 
 ### Backups
 ```bash
-# Automated backup
-./scripts/backup-all.sh
+# Run backup
+./scripts/backup.sh
+
+# Schedule automated backups (cron)
+0 2 * * * /path/to/scripts/backup.sh
 
 # Restore from backup
-./scripts/restore-backup.sh --date 2024-01-15
+./scripts/restore-backup.sh --date 2025-08-15
 ```
 
 ### Updates
@@ -175,22 +242,51 @@ docker-compose up -d
 ollama pull qwen3:235b-a22b
 ```
 
+### Platform-Specific Maintenance
+
+**Ubuntu Server**:
+```bash
+# Update NVIDIA drivers
+sudo ubuntu-drivers autoinstall
+
+# Update system
+sudo apt update && sudo apt upgrade
+```
+
+**Mac Studio**:
+```bash
+# Update Ollama
+brew upgrade ollama
+
+# Update system via System Settings
+```
+
 ## 📖 Documentation
 
 - [Architecture Overview](docs/architecture_evaluation.md)
-- [Setup Guide](docs/setup_documentation.md)
+- [Mac Setup Guide](docs/setup_documentation.md)
+- [Ubuntu Installation Guide](docs/ubuntu_installation_guide.md)
 - [Monitoring Guide](docs/monitoring_guide.md)
-- [Implementation Plan](docs/implementation_plan.md)
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
+**GPU Not Detected (Ubuntu)**
+```bash
+# Check NVIDIA driver
+nvidia-smi
+# Reinstall if needed
+sudo ubuntu-drivers autoinstall
+```
+
 **Ollama Connection Failed**
 ```bash
-# Check Ollama service
-brew services list | grep ollama
+# Mac
 brew services restart ollama
+
+# Ubuntu
+sudo systemctl restart ollama
 ```
 
 **High Memory Usage**
@@ -213,7 +309,7 @@ docker-compose ps
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Run tests
+4. Test on your target platform
 5. Submit a pull request
 
 ## 📄 License
@@ -224,7 +320,10 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
 
 - Ollama team for the excellent inference engine
 - Open WebUI for the modern interface
+- NVIDIA for CUDA ecosystem
+- Apple for Metal performance shaders
 - All open source projects that make this possible
+- CodeLLM from Abacus.AI for co-authoring this project
 
 ## 📞 Support
 
@@ -233,4 +332,4 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
 
 ---
 
-**Current Version**: 1.0.0 | **Last Updated**: July 25, 2025
+**Current Version**: 1.1.0 | **Last Updated**: July 25, 2025

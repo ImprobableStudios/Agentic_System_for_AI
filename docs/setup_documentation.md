@@ -119,8 +119,10 @@ The `docker-compose.yml` file defines all services:
 
 ### Service Configurations
 Configuration files are in the `config/` directory:
+- `models-mac.conf`: AI model definitions for Mac platform
+- `models-linux.conf`: AI model definitions for Linux platform
 - `traefik/`: Reverse proxy rules
-- `litellm/config.yaml`: Model configurations
+- `litellm/config.yaml`: Model configurations (generated from template)
 - `postgresql/postgresql.conf`: Database tuning
 - `prometheus/prometheus.yml`: Metrics scraping
 - `grafana/`: Dashboards and datasources

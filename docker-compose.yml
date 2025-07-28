@@ -88,17 +88,20 @@ services:
 
   # AI Inference Layer
   litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+    image: ghcr.io/berriai/litellm:main-stable
     container_name: agentic-litellm
     restart: unless-stopped
     environment:
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-agentic_user}:${POSTGRES_PASSWORD}@agentic-postgresql:5432/${POSTGRES_DB:-agentic_ai}?schema=litellm
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-agentic_user}:${POSTGRES_PASSWORD}@agentic-postgresql:5432/litellm
       - REDIS_HOST=agentic-redis
       - REDIS_PORT=6379
+      - UI_USERNANE=admin
+      - UI_PASSWORD=${LITELLM_UI_PASSWORD}
       - LITELLM_LOG=INFO
       - STORE_MODEL_IN_DB=True
       - LITELLM_SALT_KEY=${LITELLM_MASTER_KEY}
+      # - PRISMA_GENERATE=true
     volumes:
       - ./config/litellm:/app/config:ro
     command: ["--config", "/app/config/config.yaml", "--port", "4000", "--num_workers", "8"]
@@ -205,7 +208,6 @@ services:
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
       - NODE_ENV=production
-      - EXECUTIONS_PROCESS=main
       - EXECUTIONS_MODE=queue
       - QUEUE_BULL_REDIS_HOST=agentic-redis
       - QUEUE_BULL_REDIS_PORT=6379
@@ -214,6 +216,9 @@ services:
       - N8N_PUBLIC_API_DISABLED=false
       - N8N_DISABLE_PRODUCTION_MAIN_PROCESS=false
       - N8N_SECURE_COOKIE=false
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=false
+      - N8N_RUNNERS_ENABLED=true
+      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=true
     volumes:
       - ./data/n8n:/home/node/.n8n
     networks:
@@ -250,13 +255,13 @@ services:
       - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
       # TODO Temporarily commenting out DATABASE_URL due to OpenWebUI database initialization bug (15300)
       # - DATABASE_URL=postgresql://${POSTGRES_USER:-agentic_user}:${POSTGRES_PASSWORD}@agentic-postgresql:5432/${POSTGRES_DB:-agentic_ai}
-      - DEFAULT_MODELS=qwen3:235b-a22b,mychen76/qwen3_cline_roocode:14b,mistral
+      - DEFAULT_MODELS=${DEFAULT_MODELS:-primary,code,small}
       - WEBUI_NAME=${WEBUI_NAME:-Agentic AI System}
       - WEBUI_URL=http://ai.${DOMAIN_NAME:-local}
       - ENABLE_COMMUNITY_SHARING=false
       - ENABLE_MESSAGE_RATING=true
       - ENABLE_MODEL_FILTER=true
-      - MODEL_FILTER_LIST=${MODEL_FILTER_LIST:-qwen3:235b-a22b;mychen76/qwen3_cline_roocode:14b;mistral}
+      - MODEL_FILTER_LIST=${MODEL_FILTER_LIST}
     volumes:
       - ./data/open-webui:/app/backend/data
     networks:

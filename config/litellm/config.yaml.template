@@ -1,0 +1,244 @@
+# LiteLLM Configuration
+# This configuration uses template variables that will be replaced by setup scripts
+
+model_list:
+  # Primary general-purpose model - {{PRIMARY_MODEL}}
+  - model_name: "{{PRIMARY_MODEL}}"
+    litellm_params:
+      model: "ollama/{{PRIMARY_MODEL}}"
+      api_base: http://host.docker.internal:11434
+      temperature: 0.7
+      max_tokens: 4096
+      stream: true
+      tags: ["general", "primary"]
+    metadata:
+      notes: "Primary general-purpose model for complex reasoning and analysis"
+      capabilities: ["reasoning", "analysis", "general_qa"]
+
+  # Code generation and analysis - {{CODE_MODEL}}
+  - model_name: "{{CODE_MODEL}}"
+    litellm_params:
+      model: "ollama/{{CODE_MODEL}}"
+      api_base: http://host.docker.internal:11434
+      temperature: 0.5
+      max_tokens: 8192
+      stream: true
+      tags: ["code", "technical"]
+    metadata:
+      notes: "Specialized model for code generation and technical tasks"
+      capabilities: ["code_generation", "code_review", "debugging"]
+
+  # Embedding model - {{EMBEDDING_MODEL}}
+  - model_name: "{{EMBEDDING_MODEL}}"
+    litellm_params:
+      model: "ollama/{{EMBEDDING_MODEL}}"
+      api_base: http://host.docker.internal:11434
+      embedding: true
+      tags: ["embedding"]
+    metadata:
+      notes: "Embedding model for vector operations and semantic search"
+      capabilities: ["embeddings", "semantic_search"]
+
+  # Reranking model - {{RERANKING_MODEL}}
+  - model_name: "{{RERANKING_MODEL}}"
+    litellm_params:
+      model: "ollama/{{RERANKING_MODEL}}"
+      api_base: http://host.docker.internal:11434
+      tags: ["reranking"]
+    metadata:
+      notes: "Reranking model for search result optimization"
+      capabilities: ["reranking", "relevance_scoring"]
+
+  # Small general-purpose model - {{SMALL_MODEL}}
+  - model_name: "{{SMALL_MODEL}}"
+    litellm_params:
+      model: "ollama/{{SMALL_MODEL}}"
+      api_base: http://host.docker.internal:11434
+      temperature: 0.7
+      max_tokens: 4096
+      stream: true
+      tags: ["small", "fast"]
+    metadata:
+      notes: "Small, fast model for quick tasks and low-latency responses"
+      capabilities: ["quick_tasks", "simple_qa", "fast_response"]
+
+  # OpenAI fallback models
+  - model_name: "gpt-3.5-turbo"
+    litellm_params:
+      model: "gpt-3.5-turbo"
+      api_key: "${OPENAI_API_KEY}"
+      temperature: 0.7
+      max_tokens: 4096
+      tags: ["openai", "fallback"]
+    metadata:
+      notes: "OpenAI GPT-3.5 Turbo for fallback when local models are unavailable"
+
+  - model_name: "gpt-4"
+    litellm_params:
+      model: "gpt-4"
+      api_key: "${OPENAI_API_KEY}"
+      temperature: 0.7
+      max_tokens: 8192
+      tags: ["openai", "fallback", "advanced"]
+    metadata:
+      notes: "OpenAI GPT-4 for advanced tasks when local models are insufficient"
+
+# Router configuration for intelligent model selection
+router_settings:
+  routing_strategy: "usage-based-routing"
+  
+  # Model selection rules
+  model_group_alias:
+    general: ["{{PRIMARY_MODEL}}", "gpt-3.5-turbo"]
+    code: ["{{CODE_MODEL}}", "{{PRIMARY_MODEL}}"]
+    embedding: ["{{EMBEDDING_MODEL}}"]
+    reranking: ["{{RERANKING_MODEL}}"]
+    fast: ["{{SMALL_MODEL}}", "gpt-3.5-turbo"]
+    
+  # Fallback chains
+  fallbacks: [
+    {"{{PRIMARY_MODEL}}": ["{{SMALL_MODEL}}"]},
+    {"{{CODE_MODEL}}": ["{{PRIMARY_MODEL}}"]},
+    {"{{EMBEDDING_MODEL}}": ["{{PRIMARY_MODEL}}"]},
+    {"{{RERANKING_MODEL}}": ["{{PRIMARY_MODEL}}"]},
+    {"{{SMALL_MODEL}}": ["{{PRIMARY_MODEL}}"]},
+    {"gpt-3.5-turbo": ["{{PRIMARY_MODEL}}"]},
+    {"gpt-4": ["gpt-3.5-turbo", "{{PRIMARY_MODEL}}"]}
+  ]
+  
+  # Context-based routing
+  context_routing:
+    - pattern: "code|function|class|debug|implement"
+      preferred_models: ["{{CODE_MODEL}}", "{{PRIMARY_MODEL}}"]
+    - pattern: "embed|vector|similarity"
+      preferred_models: ["{{EMBEDDING_MODEL}}"]
+    - pattern: "rank|rerank|relevance"
+      preferred_models: ["{{RERANKING_MODEL}}"]
+    - pattern: "quick|simple|fast"
+      preferred_models: ["{{SMALL_MODEL}}", "gpt-3.5-turbo"]
+      
+  # Load balancing
+  enable_loadbalancing: true
+  loadbalancing_strategy: "least-busy"
+  
+  # Caching
+  cache: true
+  cache_ttl: 3600
+  
+  # Retry configuration
+  num_retries: 3
+  retry_after: 5
+  
+  # Request timeout
+  request_timeout: 600
+  
+  # Model-specific overrides
+  model_config:
+    "{{PRIMARY_MODEL}}":
+      max_parallel_requests: 2
+      tpm_limit: 100000
+    "{{CODE_MODEL}}":
+      max_parallel_requests: 2
+      tpm_limit: 150000
+    "{{EMBEDDING_MODEL}}":
+      max_parallel_requests: 10
+      batch_size: 100
+    "{{SMALL_MODEL}}":
+      max_parallel_requests: 5
+      tpm_limit: 200000
+
+# General settings
+general_settings:
+  # Completion model can be specified via environment or default to primary
+  # completion_model: "{{PRIMARY_MODEL}}"  # Commented out to allow dynamic model selection
+  
+  # Master key for authentication
+  master_key: "${LITELLM_MASTER_KEY}"
+  
+  # Database for tracking (Set in .env)
+  # database_url: "postgresql://litellm:password@postgres:5432/litellm"
+  
+  # Logging
+  log_level: "INFO"
+  json_logs: true
+  
+  # Telemetry
+  telemetry: false
+  
+  # UI Configuration
+  ui_access_mode: "admin"
+  
+  # Health check endpoint
+  health_check_interval: 60
+  
+  # CORS
+  allowed_origins: ["*"]
+  
+  # Rate limiting
+  max_budget: 1000
+  budget_duration: "1d"
+  
+  # Request validation
+  enforce_user_param: false
+  
+  # Streaming
+  stream: true
+  
+  # Model aliasing - allows using shorthand names
+  model_alias_map:
+    "primary": "{{PRIMARY_MODEL}}"
+    "code": "{{CODE_MODEL}}"
+    "embed": "{{EMBEDDING_MODEL}}"
+    "rerank": "{{RERANKING_MODEL}}"
+    "small": "{{SMALL_MODEL}}"
+
+# Environment-specific settings
+environment_variables:
+  # Ollama connection
+  OLLAMA_HOST: "http://host.docker.internal:11434"
+  
+  # OpenAI (optional fallback)
+  # OPENAI_API_KEY: "${OPENAI_API_KEY}"
+  
+  # Model loading optimization
+  OLLAMA_NUM_PARALLEL: "4"
+  OLLAMA_MAX_LOADED_MODELS: "3"
+  
+  # GPU Memory settings (platform-specific, set by setup scripts)
+  # OLLAMA_GPU_OVERHEAD: "2147483648"
+
+# Monitoring and observability
+monitoring:
+  # Prometheus metrics
+  enable_prometheus_metrics: true
+  metrics_port: 9090
+  
+  # Request logging
+  log_requests: true
+  log_responses: false
+  
+  # Performance tracking
+  track_model_latency: true
+  track_token_usage: true
+
+# Security settings
+security:
+  # API key validation
+  enforce_api_key: true
+  
+  # IP allowlist (commented out for development)
+  # allowed_ips: ["127.0.0.1", "172.16.0.0/12"]
+  
+  # Request size limits
+  max_request_size_mb: 10
+  
+  # Token limits per request
+  max_tokens_per_request: 65536
+
+# Mock responses for testing
+mock_responses:
+  - route: "/v1/models"
+    response: {"models": ["{{PRIMARY_MODEL}}", "{{CODE_MODEL}}", "{{EMBEDDING_MODEL}}", "{{RERANKING_MODEL}}", "{{SMALL_MODEL}}", "gpt-3.5-turbo", "gpt-4"]}
+  
+  - route: "/health"
+    response: {"status": "healthy", "models_loaded": true}

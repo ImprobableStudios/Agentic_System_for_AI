@@ -57,6 +57,16 @@ main() {
         log_warning "Logs directory not found. Skipping."
     fi
 
+    # Delete LiteLLM config file
+    LITELLM_CONFIG="${PROJECT_DIR}/config/litellm/config.yaml"
+    if [ -f "$LITELLM_CONFIG" ]; then
+        log_info "Deleting LiteLLM config file: $LITELLM_CONFIG"
+        rm -f "$LITELLM_CONFIG"
+        log_success "LiteLLM config file deleted."
+    else
+        log_warning "LiteLLM config file not found. Skipping."
+    fi
+
     log_success "Cleanup process completed."
 }
 

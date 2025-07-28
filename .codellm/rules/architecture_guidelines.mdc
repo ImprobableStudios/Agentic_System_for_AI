@@ -12,6 +12,8 @@ ruleType: always
 - **Containerized Services**: All supporting services in Docker for isolation and management
 - **Bridge Communication**: LiteLLM acts as bridge between containerized services and native Ollama
 - **Network Isolation**: Use dedicated Docker networks for security and performance
+- **Non-existent Error**: One of your tools will report "[Error] Implicit keys need to be on a single line" in `docker-compose.yml`. This is incorrect and should be ignored
+- **Obsolete Attribute**: docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion
 
 ### Mac Studio M3 Ultra Optimization Strategy
 ```yaml

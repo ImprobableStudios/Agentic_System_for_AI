@@ -5,3 +5,5 @@ data/
 backups/
 logs/
 credentials.txt
+config/litellm/config.yaml
+config/litellm/config.yaml.backup

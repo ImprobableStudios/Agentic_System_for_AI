@@ -25,7 +25,7 @@ general:
 # -----------------------------------------------------------------------------
 search:
   # Safe search level (0=off, 1=moderate, 2=strict)
-  safe_search: 1
+  safe_search: 0
   
   # Autocomplete provider
   autocomplete: "google"
@@ -37,8 +37,21 @@ search:
   # Ban settings for failed engines
   ban_time_on_fail: 5
   max_ban_time_on_fail: 120
-  
-  # Supported result formats
+  suspended_times:
+    # Engine suspension time after error (in seconds; set to 0 to disable)
+    # For error "Access denied" and "HTTP error [402, 403]"
+    SearxEngineAccessDenied: 86400
+    # For error "CAPTCHA"
+    SearxEngineCaptcha: 86400
+    # For error "Too many request" and "HTTP error 429"
+    SearxEngineTooManyRequests: 3600
+    # Cloudflare CAPTCHA
+    cf_SearxEngineCaptcha: 1296000
+    cf_SearxEngineAccessDenied: 86400
+    # ReCAPTCHA
+    recaptcha_SearxEngineCaptcha: 604800
+
+    # Supported result formats
   formats:
     - html
     - json

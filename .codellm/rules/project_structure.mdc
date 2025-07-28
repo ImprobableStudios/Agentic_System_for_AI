@@ -9,7 +9,7 @@ ruleType: always
 
 ### Root Level Structure
 ```
-agentic-ai-system/
+Agentic_System_for_AI/
 ├── docker-compose.yml          # Main service orchestration
 ├── docker-compose.override.yml # Local development overrides
 ├── .env.example               # Environment template
