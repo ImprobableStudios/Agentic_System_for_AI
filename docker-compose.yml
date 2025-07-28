@@ -99,9 +99,6 @@ services:
       - UI_USERNANE=admin
       - UI_PASSWORD=${LITELLM_UI_PASSWORD}
       - LITELLM_LOG=INFO
-      - STORE_MODEL_IN_DB=True
-      - LITELLM_SALT_KEY=${LITELLM_MASTER_KEY}
-      # - PRISMA_GENERATE=true
     volumes:
       - ./config/litellm:/app/config:ro
     command: ["--config", "/app/config/config.yaml", "--port", "4000", "--num_workers", "8"]
