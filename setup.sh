@@ -382,7 +382,7 @@ install_nvidia_drivers() {
 
     # Install NVIDIA drivers
     log_info "Installing NVIDIA drivers..."
-    sudo apt-get install -y nvidia-driver-535 nvidia-dkms-535
+    sudo apt-get install -y nvidia-driver-575 nvidia-dkms-575
 
     # Install CUDA toolkit
     log_info "Installing CUDA toolkit..."
@@ -424,6 +424,7 @@ install_prerequisites_ubuntu() {
         curl \
         wget \
         git \
+        apache2-utils \
         jq \
         htop \
         net-tools \
@@ -692,15 +693,15 @@ create_directories() {
 # Generate secure passwords and keys
 generate_secrets() {
     log_info "Generating secure passwords and keys..."
-    
+
     if [[ -f .env ]]; then
         log_warning ".env file already exists, backing up to .env.backup"
         cp .env .env.backup
     fi
-    
+
     # Copy template and generate secrets
     cp .env.example .env
-    
+
     # Generate passwords
     local admin_password=$(openssl rand -hex 8)
     local postgres_password=$(openssl rand -hex 16)
@@ -711,25 +712,25 @@ generate_secrets() {
     local webui_secret=$(openssl rand -base64 32)
     local n8n_encryption_key=$(openssl rand -base64 32)
     local grafana_secret=$(openssl rand -base64 32)
-    
+
     # Generate htpasswd hashe
     local admin_hash=\'$(htpasswd -nb admin "$admin_password")\'
-    
-    # Replace placeholders in .env file
-    sed -i '' "s|CHANGE_ME_POSTGRES_PASSWORD|$postgres_password|g" .env
-    sed -i '' "s|CHANGE_ME_LITELLM_UI_PASSWORD|$admin_password|g" .env
-    sed -i '' "s|CHANGE_ME_N8N_PASSWORD|$admin_password|g" .env
-    sed -i '' "s|CHANGE_ME_GRAFANA_PASSWORD|$admin_password|g" .env
-    sed -i '' "s|CHANGE_ME_LITELLM_MASTER_KEY|$litellm_key|g" .env
-    
-    sed -i '' "s|CHANGE_ME_WEBUI_SECRET_KEY|$webui_secret|g" .env
-    sed -i '' "s|CHANGE_ME_N8N_ENCRYPTION_KEY|$n8n_encryption_key|g" .env
-    sed -i '' "s|CHANGE_ME_SEARXNG_SECRET|$searxng_secret|g" .env
-    sed -i '' "s|CHANGE_ME_GRAFANA_SECRET|$grafana_secret|g" .env
 
-    sed -i '' "s|CHANGE_ME_HTPASSWD_HASH|$admin_hash|g" .env
-    sed -i '' "s|CHANGE_ME_PROMETHEUS_HTPASSWD|$admin_hash|g" .env
-    sed -i '' "s|CHANGE_ME_ALERTMANAGER_HTPASSWD|$admin_hash|g" .env
+    # Replace placeholders in .env file
+    sed -i.bak "s|CHANGE_ME_POSTGRES_PASSWORD|$postgres_password|g" .env
+    sed -i.bak "s|CHANGE_ME_LITELLM_UI_PASSWORD|$admin_password|g" .env
+    sed -i.bak "s|CHANGE_ME_N8N_PASSWORD|$admin_password|g" .env
+    sed -i.bak "s|CHANGE_ME_GRAFANA_PASSWORD|$admin_password|g" .env
+    sed -i.bak "s|CHANGE_ME_LITELLM_MASTER_KEY|$litellm_key|g" .env
+
+    sed -i.bak "s|CHANGE_ME_WEBUI_SECRET_KEY|$webui_secret|g" .env
+    sed -i.bak "s|CHANGE_ME_N8N_ENCRYPTION_KEY|$n8n_encryption_key|g" .env
+    sed -i.bak "s|CHANGE_ME_SEARXNG_SECRET|$searxng_secret|g" .env
+    sed -i.bak "s|CHANGE_ME_GRAFANA_SECRET|$grafana_secret|g" .env
+
+    sed -i.bak "s|CHANGE_ME_HTPASSWD_HASH|$admin_hash|g" .env
+    sed -i.bak "s|CHANGE_ME_PROMETHEUS_HTPASSWD|$admin_hash|g" .env
+    sed -i.bak "s|CHANGE_ME_ALERTMANAGER_HTPASSWD|$admin_hash|g" .env
 
     # Generate MODEL_FILTER_LIST from configuration
     local model_filter_list=""
@@ -741,6 +742,11 @@ generate_secrets() {
         fi
     done
     sed -i '' "s|GENERATED_BY_SETUP_SCRIPT|$model_filter_list|g" .env
+
+    # Remove backup file created by sed
+    if [ -f ".env.bak" ]; then
+        rm .env.bak
+    fi
 
     # Generate DEFAULT_MODELS from aliases
     local default_models=""

@@ -7,3 +7,4 @@ logs/
 credentials.txt
 config/litellm/config.yaml
 config/litellm/config.yaml.backup
+.env.bak

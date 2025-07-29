@@ -96,7 +96,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-agentic_user}:${POSTGRES_PASSWORD}@agentic-postgresql:5432/litellm
       - REDIS_HOST=agentic-redis
       - REDIS_PORT=6379
-      - UI_USERNANE=admin
+      - UI_USERNAME=admin
       - UI_PASSWORD=${LITELLM_UI_PASSWORD}
       - LITELLM_LOG=INFO
     volumes:
