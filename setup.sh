@@ -44,6 +44,7 @@ PLATFORM=""
 MODEL_CONFIG=""
 REQUIRED_MEMORY_GB=0
 REQUIRED_DISK_GB=0
+DOCKER_COMPOSE="docker-compose"
 
 # =============================================================================
 # LOGGING FUNCTIONS
@@ -135,9 +136,9 @@ clean_environment() {
     log_info "Cleaning up the environment..."
 
     # Stop and remove all Docker containers
-    if command -v docker-compose &> /dev/null; then
+    if command -v ${DOCKER_COMPOSE} &> /dev/null; then
         log_info "Stopping and removing Docker containers..."
-        docker-compose down -v --remove-orphans
+        ${DOCKER_COMPOSE} down -v --remove-orphans
     fi
 
     # Delete data directories
@@ -166,6 +167,7 @@ check_os() {
                 MODEL_CONFIG="${SCRIPT_DIR}/config/models-linux.conf"
                 REQUIRED_MEMORY_GB=64
                 REQUIRED_DISK_GB=1000
+                DOCKER_COMPOSE="sudo docker compose"
                 log_success "Running on Ubuntu 24.04"
             else
                 log_error "This script supports Ubuntu 24.04. Detected: $DISTRO $VERSION"
@@ -206,6 +208,7 @@ check_os() {
 
     # Export platform variable for use throughout the script
     export PLATFORM
+    export DOCKER_COMPOSE
     export MODEL_CONFIG
     export REQUIRED_MEMORY_GB
     export REQUIRED_DISK_GB
@@ -741,7 +744,7 @@ generate_secrets() {
             model_filter_list="${model_filter_list};${model}"
         fi
     done
-    sed -i '' "s|GENERATED_BY_SETUP_SCRIPT|$model_filter_list|g" .env
+    sed -i.bak "s|GENERATED_BY_SETUP_SCRIPT|$model_filter_list|g" .env
 
     # Remove backup file created by sed
     if [ -f ".env.bak" ]; then
@@ -795,7 +798,7 @@ prepare_docker_images() {
     log_info "Pulling Docker images..."
     
     # Pull all required images
-    docker-compose pull
+    ${DOCKER_COMPOSE} pull
     
     log_success "Docker images pulled successfully"
 }
@@ -806,7 +809,7 @@ start_services() {
     
     # Start core services first
     log_info "Starting core database services..."
-    docker-compose up -d postgresql redis
+    ${DOCKER_COMPOSE} up -d postgresql redis
     
     # Wait for databases to be ready
     log_info "Waiting for databases to be ready..."
@@ -814,14 +817,14 @@ start_services() {
     
     # Start monitoring stack
     log_info "Starting monitoring services..."
-    docker-compose up -d prometheus grafana alertmanager node-exporter postgres-exporter redis-exporter cadvisor loki promtail
+    ${DOCKER_COMPOSE} up -d prometheus grafana alertmanager node-exporter postgres-exporter redis-exporter cadvisor loki promtail
     
     # Wait for monitoring to be ready
     sleep 20
     
     # Start remaining services
     log_info "Starting remaining services..."
-    docker-compose up -d
+    ${DOCKER_COMPOSE} up -d
     
     # Wait for all services to be ready
     log_info "Waiting for all services to be ready..."
@@ -845,7 +848,7 @@ verify_installation() {
     local services=("postgresql" "redis" "litellm" "qdrant" "searxng" "n8n" "open-webui" "traefik" "prometheus" "grafana" "alertmanager")
     
     for service in "${services[@]}"; do
-        if docker-compose ps "$service" | grep -q "Up"; then
+        if ${DOCKER_COMPOSE} ps "$service" | grep -q "Up"; then
             log_success "✓ $service is running"
         else
             log_error "✗ $service is not running"
@@ -855,7 +858,7 @@ verify_installation() {
     # Test LiteLLM connection to native Ollama
     log_info "Testing LiteLLM connection to native Ollama..."
     sleep 10
-    if docker-compose exec -T litellm curl -s http://host.docker.internal:11434/api/tags > /dev/null; then
+    if ${DOCKER_COMPOSE} exec -T litellm curl -s http://host.docker.internal:11434/api/tags > /dev/null; then
         log_success "✓ LiteLLM can connect to native Ollama"
     else
         log_warning "⚠ LiteLLM connection to native Ollama needs verification"
@@ -897,9 +900,9 @@ display_final_info() {
     log_info "  - Small: $SMALL_MODEL"
     echo ""
     log_info "Management Commands:"
-    log_info "• View logs: docker-compose logs -f [service_name]"
-    log_info "• Restart services: docker-compose restart"
-    log_info "• Stop all: docker-compose down"
+    log_info "• View logs: ${DOCKER_COMPOSE} logs -f [service_name]"
+    log_info "• Restart services: ${DOCKER_COMPOSE} restart"
+    log_info "• Stop all: ${DOCKER_COMPOSE} down"
     log_info "• Restart Ollama: brew services restart ollama"
     log_info "• Check Ollama: ollama list"
     echo ""

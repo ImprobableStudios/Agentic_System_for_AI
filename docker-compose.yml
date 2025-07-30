@@ -111,7 +111,7 @@ services:
       - "4000:4000"
       - "127.0.0.1:4001:4001"  # Prometheus metrics port
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.17.0.1"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.litellm.rule=Host(`api.${DOMAIN_NAME:-local}`) || PathPrefix(`/v1/`)"
@@ -265,6 +265,8 @@ services:
       - agentic-ai-backend
       - agentic-ai-data
       - agentic-ai-frontend
+    extra_hosts:
+      - "host.docker.internal:172.17.0.1"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.webui.rule=Host(`ai.${DOMAIN_NAME:-local}`) || Host(`${DOMAIN_NAME:-localhost}`)"
@@ -309,7 +311,7 @@ services:
     ports:
       - "127.0.0.1:9090:9090"
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.17.0.1"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN_NAME:-local}`)"
