@@ -385,7 +385,12 @@ install_nvidia_drivers() {
 
     # Install NVIDIA drivers
     log_info "Installing NVIDIA drivers..."
-    sudo apt-get install -y nvidia-driver-575 nvidia-dkms-575
+    
+    # Install recommended drivers
+    sudo ubuntu-drivers install --gpgpu
+
+    # Use this if you have a specific driver version to install
+    # sudo apt-get install -y nvidia-driver-575 nvidia-dkms-575
 
     # Install CUDA toolkit
     log_info "Installing CUDA toolkit..."
@@ -428,6 +433,8 @@ install_prerequisites_ubuntu() {
         wget \
         git \
         apache2-utils \
+        nvtop \
+        btop \
         jq \
         htop \
         net-tools \
@@ -688,7 +695,7 @@ create_directories() {
     done
 
     # Set appropriate permissions
-    chmod -R 755 "${SCRIPT_DIR}/data"
+    sudo chmod -R 777 "data/"
     
     log_success "Data directories created"
 }

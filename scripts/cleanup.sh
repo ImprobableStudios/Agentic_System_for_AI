@@ -27,14 +27,66 @@ log_success() {
     echo "[SUCCESS] $(date +"%Y-%m-%d %H:%M:%S") - $1"
 }
 
+# Check OS and set platform-specific configurations
+check_os() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS detected
+        DOCKER_COMPOSE="docker-compose"
+        log_success "Running on macOS"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Linux detected - check if it's Ubuntu 24.04
+        if command -v lsb_release &> /dev/null; then
+            DISTRO=$(lsb_release -si)
+            VERSION=$(lsb_release -sr)
+            if [[ "$DISTRO" == "Ubuntu" && "$VERSION" == "24.04" ]]; then
+                DOCKER_COMPOSE="sudo docker compose"
+                log_success "Running on Ubuntu 24.04"
+            else
+                log_error "This script supports Ubuntu 24.04. Detected: $DISTRO $VERSION"
+                echo ""
+                log_info "For other platforms, please check the documentation."
+                exit 1
+            fi
+        else
+            # Fallback check for Ubuntu without lsb_release
+            if [[ -f /etc/os-release ]]; then
+                source /etc/os-release
+                if [[ "$ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]]; then
+                    DOCKER_COMPOSE="sudo docker compose"
+                    log_success "Running on Ubuntu 24.04"
+                else
+                    log_error "This script supports Ubuntu 24.04. Detected: $ID $VERSION_ID"
+                    echo ""
+                    log_info "For other platforms, please check the documentation."
+                    exit 1
+                fi
+            else
+                log_error "Unable to determine Linux distribution. This script supports Ubuntu 24.04."
+                exit 1
+            fi
+        fi
+    else
+        log_error "Unsupported operating system: $OSTYPE"
+        echo ""
+        log_info "This script supports:"
+        echo -e "${BLUE}  - macOS (Apple Silicon)${NC}"
+        echo -e "${BLUE}  - Ubuntu 24.04 (NVIDIA GPU)${NC}"
+        echo ""
+        exit 1
+    fi
+}
+
 # --- Main Logic ---
 main() {
     log_info "Starting cleanup process..."
 
+    # Verify OS and set Docker Compose command
+    check_os 
+
     # Stop and remove Docker containers, networks, and volumes
     if [ -f "${PROJECT_DIR}/docker-compose.yml" ]; then
         log_info "Stopping and removing Docker services..."
-        docker-compose down -v --remove-orphans
+        ${DOCKER_COMPOSE} down -v --remove-orphans
         log_success "Docker services stopped and removed."
     else
         log_warning "docker-compose.yml not found. Skipping Docker cleanup."
@@ -43,7 +95,7 @@ main() {
     # Delete data and log directories
     if [ -d "$DATA_DIR" ]; then
         log_info "Deleting data directory: $DATA_DIR"
-        rm -rf "$DATA_DIR"
+        sudo rm -rf "$DATA_DIR"
         log_success "Data directory deleted."
     else
         log_warning "Data directory not found. Skipping."
@@ -51,7 +103,7 @@ main() {
 
     if [ -d "$LOGS_DIR" ]; then
         log_info "Deleting logs directory: $LOGS_DIR"
-        rm -rf "$LOGS_DIR"
+        sudo rm -rf "$LOGS_DIR"
         log_success "Logs directory deleted."
     else
         log_warning "Logs directory not found. Skipping."

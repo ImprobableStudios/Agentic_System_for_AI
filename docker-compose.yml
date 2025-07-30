@@ -551,6 +551,26 @@ services:
       loki:
         condition: service_healthy
 
+  # Optional mDNS Service Discovery for Traefik
+  # This service helps Traefik discover services on the local network via mDNS
+  # Uncomment if you want to use mDNS for service discovery
+  # Note: Requires host networking mode to work properly
+  # traefik-avahi-helper:
+  #   image: hardillb/traefik-avahi-helper
+  #   security_opt:
+  #     - apparmor:unconfined
+  #   volumes:
+  #       - /var/run/docker.sock:/var/run/docker.sock:ro
+  #       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+  #   restart: unless-stopped
+  #   networks:
+  #     - agentic-ai-monitoring
+  #     - agentic-ai-frontend
+  #     - agentic-ai-data
+  #     - agentic-ai-backend
+  #   extra_hosts:
+  #     - "host.docker.internal:172.17.0.1"
+
 networks:
   agentic-ai-backend:
     driver: bridge
