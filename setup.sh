@@ -579,12 +579,21 @@ setup_ollama_macos() {
 setup_ollama_ubuntu() {
     log_info "Setting up native Ollama for Ubuntu..."
 
-    # Start Ollama service
-    log_info "Ensuring Ollama service is running..."
-    if ! sudo systemctl is-active --quiet ollama; then
-        log_info "Ollama service not running, attempting to start..."
-        sudo systemctl start ollama
-    fi
+    # Add environment variables to ollama.service
+    log_info "Adding environment variables to ollama.service..."
+    OLLAMA_SERVICE_DIR="/etc/systemd/system/ollama.service.d"
+    sudo mkdir -p "$OLLAMA_SERVICE_DIR"
+    sudo tee "$OLLAMA_SERVICE_DIR/override.conf" > /dev/null <<EOF
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0:11434"
+Environment="OLLAMA_FLASH_ATTENTION=true"
+EOF
+    sudo systemctl daemon-reload
+    log_success "Ollama service configuration updated."
+
+    # Start or restart Ollama service to apply changes
+    log_info "Starting/restarting Ollama service..."
+    sudo systemctl restart ollama
 
     # Enable the service to start on boot
     sudo systemctl enable ollama

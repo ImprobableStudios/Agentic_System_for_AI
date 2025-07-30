@@ -127,6 +127,38 @@ Configuration files are in the `config/` directory:
 - `prometheus/prometheus.yml`: Metrics scraping
 - `grafana/`: Dashboards and datasources
 
+### mDNS Service Discovery
+
+#### Optional Traefik mDNS Helper
+
+The system includes an optional `traefik-avahi-helper` container that enables mDNS (multicast DNS) service discovery for Traefik. This service helps in resolving local `.local` domain names across different platforms.
+
+##### Windows Compatibility
+
+On Windows systems, you'll need to install Bonjour Print Services from Apple to enable mDNS resolution. You can download it from: https://support.apple.com/en-us/106380
+
+##### Enabling the Service
+
+The mDNS helper is currently commented out in the `docker-compose.yml` file. To enable it:
+
+1. Uncomment the `traefik-avahi-helper` service block in `docker-compose.yml`
+2. Restart the Docker Compose services
+
+```bash
+# Uncomment the service in docker-compose.yml
+# Restart services
+docker-compose up -d
+```
+
+##### How It Works
+
+- Uses the `hardillb/traefik-avahi-helper` image
+- Provides service discovery via mDNS
+- Allows resolution of `.local` domain names
+- Requires host networking mode to function properly
+
+**Note:** This service is optional and primarily useful for local network service discovery.
+
 ## Troubleshooting
 
 ### Common Issues

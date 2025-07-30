@@ -143,6 +143,16 @@ Models are configured per platform in:
 - **Mac Studio**: `config/models-mac.conf`
 - **Ubuntu/NVIDIA**: `config/models-linux.conf`
 
+**Note:** The default model configurations are optimized for high-performance systems with large VRAM. For systems with limited resources (4GB VRAM or less), use the `config/models-4gb.conf` configuration, which provides lighter models suitable for testing and smaller deployments.
+
+To switch to the 4GB configuration:
+```bash
+# Copy the 4GB configuration
+cp config/models-4gb.conf config/models-mac.conf  # For Mac
+# or
+cp config/models-4gb.conf config/models-linux.conf  # For Ubuntu
+```
+
 Each platform includes:
 - Primary general-purpose model
 - Code-specialized model
@@ -169,6 +179,10 @@ After deployment, access:
 | Grafana | http://grafana.local | Monitoring Dashboards |
 | Prometheus | http://prometheus.local | Metrics Browser |
 | AlertManager | http://alertmanager.local | Alert Management |
+
+#### mDNS Service Discovery
+
+The system supports optional local `.local` domain resolution via an optional mDNS helper service. On Windows, you'll need to install [Bonjour Print Services](https://support.apple.com/en-us/106380) to enable this feature. See the [setup documentation](docs/setup_documentation.md#mdns-service-discovery) for more details. This feature is not enabled by default.
 
 ### API Access
 

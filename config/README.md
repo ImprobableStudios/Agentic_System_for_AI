@@ -2,10 +2,12 @@
 
 This directory contains model configuration files for different platforms. The AI models used in the Agentic AI System are now centrally configured through these files.
 
+
 ## Configuration Files
 
 - `models-mac.conf` - Model configuration for macOS/Apple Silicon platforms
 - `models-linux.conf` - Model configuration for Linux/NVIDIA GPU platforms
+- `models-4gb.conf` - **Lightweight model configuration for systems with limited VRAM (4GB or less)**
 - `litellm/config.yaml.template` - Template for LiteLLM configuration (processed during setup)
 
 ## Model Types
@@ -75,6 +77,36 @@ declare -a MODELS_TO_PULL=(
     "my-custom-model:latest"  # Add custom model
 )
 ```
+
+## 4GB Configuration
+
+The `models-4gb.conf` file provides a lightweight model configuration designed for:
+- Systems with limited VRAM (4GB or less)
+- Testing and development environments
+- Smaller deployments with constrained resources
+
+### Key Differences
+- Smaller, more memory-efficient models
+- Reduced model sizes to fit within 4GB VRAM
+- Faster model download time
+- Suitable for initial testing or low-resource scenarios
+
+### Switching to 4GB Configuration
+
+To use the 4GB configuration:
+
+```bash
+# For Mac
+cp config/models-4gb.conf config/models-mac.conf
+
+# For Linux/NVIDIA
+cp config/models-4gb.conf config/models-linux.conf
+
+# Then run setup
+./setup.sh
+```
+
+**Note:** The 4GB configuration trades some model performance for lower memory usage. For production or high-performance requirements, use the platform-specific default configurations.
 
 ## Model Aliases
 
