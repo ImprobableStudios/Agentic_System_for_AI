@@ -93,7 +93,7 @@ Models are automatically configured from `config/models-linux.conf` during setup
 - **Code Model**: Code generation and analysis (default: codellama:34b)
 - **Embedding Model**: Vector operations (default: jeffh/intfloat-e5-base-v2:f16)
 - **Reranking Model**: Search optimization (default: jeffh/intfloat-e5-base-v2:f16)
-- **Small Model**: Quick tasks (default: mistral:7b-instruct-q8_0)
+- **Fast Model**: Quick tasks (default: mistral:7b-instruct-q8_0)
 
 To customize models before installation:
 ```bash

@@ -3,7 +3,7 @@
 
 model_list:
   # Primary general-purpose model - {{PRIMARY_MODEL}}
-  - model_name: "{{PRIMARY_MODEL}}"
+  - model_name: "general"
     litellm_params:
       model: "ollama/{{PRIMARY_MODEL}}"
       api_base: http://host.docker.internal:11434
@@ -16,7 +16,7 @@ model_list:
       capabilities: ["reasoning", "analysis", "general_qa"]
 
   # Code generation and analysis - {{CODE_MODEL}}
-  - model_name: "{{CODE_MODEL}}"
+  - model_name: "code"
     litellm_params:
       model: "ollama/{{CODE_MODEL}}"
       api_base: http://host.docker.internal:11434
@@ -29,7 +29,7 @@ model_list:
       capabilities: ["code_generation", "code_review", "debugging"]
 
   # Embedding model - {{EMBEDDING_MODEL}}
-  - model_name: "{{EMBEDDING_MODEL}}"
+  - model_name: "embedding"
     litellm_params:
       model: "ollama/{{EMBEDDING_MODEL}}"
       api_base: http://host.docker.internal:11434
@@ -40,7 +40,7 @@ model_list:
       capabilities: ["embeddings", "semantic_search"]
 
   # Reranking model - {{RERANKING_MODEL}}
-  - model_name: "{{RERANKING_MODEL}}"
+  - model_name: "reranking"
     litellm_params:
       model: "ollama/{{RERANKING_MODEL}}"
       api_base: http://host.docker.internal:11434
@@ -50,7 +50,7 @@ model_list:
       capabilities: ["reranking", "relevance_scoring"]
 
   # Small general-purpose model - {{SMALL_MODEL}}
-  - model_name: "{{SMALL_MODEL}}"
+  - model_name: "fast"
     litellm_params:
       model: "ollama/{{SMALL_MODEL}}"
       api_base: http://host.docker.internal:11434
@@ -62,60 +62,64 @@ model_list:
       notes: "Small, fast model for quick tasks and low-latency responses"
       capabilities: ["quick_tasks", "simple_qa", "fast_response"]
 
-  # OpenAI fallback models
-  - model_name: "gpt-3.5-turbo"
+  # External fallback models
+  - model_name: "external"
     litellm_params:
-      model: "gpt-3.5-turbo"
-      api_key: "${OPENAI_API_KEY}"
-      temperature: 0.7
-      max_tokens: 4096
-      tags: ["openai", "fallback"]
-    metadata:
-      notes: "OpenAI GPT-3.5 Turbo for fallback when local models are unavailable"
-
-  - model_name: "gpt-4"
-    litellm_params:
-      model: "gpt-4"
-      api_key: "${OPENAI_API_KEY}"
+      model: "openrouter/z-ai/glm-4.5-air:free"
+      api_base: "https://openrouter.ai/api/v1"
+      api_key: "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"
       temperature: 0.7
       max_tokens: 8192
-      tags: ["openai", "fallback", "advanced"]
+      tags: ["openrouter", "fallback", "advanced"]
     metadata:
-      notes: "OpenAI GPT-4 for advanced tasks when local models are insufficient"
+      notes: "GLM 4.5 Air - Free access via OpenRouter API"
+
+  #- model_name: "gpt-3.5-turbo"
+  #  litellm_params:
+  #    model: "gpt-3.5-turbo"
+  #    api_key: "${OPENAI_API_KEY}"
+  #    temperature: 0.7
+  #    max_tokens: 4096
+  #    tags: ["openai", "fallback"]
+  #  metadata:
+  #    notes: "OpenAI GPT-3.5 Turbo for fallback when local models are unavailable"
+
+  #- model_name: "gpt-4"
+  #  litellm_params:
+  #    model: "gpt-4"
+  #    api_key: "${OPENAI_API_KEY}"
+  #    temperature: 0.7
+  #    max_tokens: 8192
+  #    tags: ["openai", "fallback", "advanced"]
+  #  metadata:
+  #    notes: "OpenAI GPT-4 for advanced tasks when local models are insufficient"
 
 # Router configuration for intelligent model selection
 router_settings:
   routing_strategy: "usage-based-routing"
   
   # Model selection rules
-  model_group_alias:
-    general: ["{{PRIMARY_MODEL}}", "gpt-3.5-turbo"]
-    code: ["{{CODE_MODEL}}", "{{PRIMARY_MODEL}}"]
-    embedding: ["{{EMBEDDING_MODEL}}"]
-    reranking: ["{{RERANKING_MODEL}}"]
-    fast: ["{{SMALL_MODEL}}", "gpt-3.5-turbo"]
     
   # Fallback chains
   fallbacks: [
-    {"{{PRIMARY_MODEL}}": ["{{SMALL_MODEL}}"]},
-    {"{{CODE_MODEL}}": ["{{PRIMARY_MODEL}}"]},
-    {"{{EMBEDDING_MODEL}}": ["{{PRIMARY_MODEL}}"]},
-    {"{{RERANKING_MODEL}}": ["{{PRIMARY_MODEL}}"]},
-    {"{{SMALL_MODEL}}": ["{{PRIMARY_MODEL}}"]},
-    {"gpt-3.5-turbo": ["{{PRIMARY_MODEL}}"]},
-    {"gpt-4": ["gpt-3.5-turbo", "{{PRIMARY_MODEL}}"]}
+    {"general": ["fast"]},
+    {"code": ["general"]},
+    {"embedding": ["fast"]},
+    {"reranking": ["fast"]},
+    {"fast": ["general"]},
+    {"external": ["general"]}
   ]
   
   # Context-based routing
   context_routing:
     - pattern: "code|function|class|debug|implement"
-      preferred_models: ["{{CODE_MODEL}}", "{{PRIMARY_MODEL}}"]
+      preferred_models: ["code", "general"]
     - pattern: "embed|vector|similarity"
-      preferred_models: ["{{EMBEDDING_MODEL}}"]
+      preferred_models: ["embedding"]
     - pattern: "rank|rerank|relevance"
-      preferred_models: ["{{RERANKING_MODEL}}"]
+      preferred_models: ["reranking"]
     - pattern: "quick|simple|fast"
-      preferred_models: ["{{SMALL_MODEL}}", "gpt-3.5-turbo"]
+      preferred_models: ["fast", "external"]
       
   # Load balancing
   enable_loadbalancing: true
@@ -134,26 +138,26 @@ router_settings:
   
   # Model-specific overrides
   model_config:
-    "{{PRIMARY_MODEL}}":
+    "general":
       max_parallel_requests: 2
       tpm_limit: 100000
-    "{{CODE_MODEL}}":
+    "code":
       max_parallel_requests: 2
       tpm_limit: 150000
-    "{{EMBEDDING_MODEL}}":
+    "embedding":
       max_parallel_requests: 10
       batch_size: 100
-    "{{SMALL_MODEL}}":
+    "fast":
       max_parallel_requests: 5
       tpm_limit: 200000
 
 # General settings
 general_settings:
   # Completion model can be specified via environment or default to primary
-  # completion_model: "{{PRIMARY_MODEL}}"  # Commented out to allow dynamic model selection
+  # completion_model: "primary"  # Commented out to allow dynamic model selection
   
   # Master key for authentication
-  master_key: "${LITELLM_MASTER_KEY}"
+  master_key: "{{LITELLM_MASTER_KEY}}"
   
   # Database for tracking (Set in .env)
   # database_url: "postgresql://litellm:password@postgres:5432/litellm"
@@ -184,14 +188,6 @@ general_settings:
   # Streaming
   stream: true
   
-  # Model aliasing - allows using shorthand names
-  model_alias_map:
-    "primary": "{{PRIMARY_MODEL}}"
-    "code": "{{CODE_MODEL}}"
-    "embed": "{{EMBEDDING_MODEL}}"
-    "rerank": "{{RERANKING_MODEL}}"
-    "small": "{{SMALL_MODEL}}"
-
 # Environment-specific settings
 environment_variables:
   # Ollama connection
@@ -238,7 +234,7 @@ security:
 # Mock responses for testing
 mock_responses:
   - route: "/v1/models"
-    response: {"models": ["{{PRIMARY_MODEL}}", "{{CODE_MODEL}}", "{{EMBEDDING_MODEL}}", "{{RERANKING_MODEL}}", "{{SMALL_MODEL}}", "gpt-3.5-turbo", "gpt-4"]}
+    response: {"models": ["general", "code", "embedding", "reranking", "fast"]}
   
   - route: "/health"
     response: {"status": "healthy", "models_loaded": true}

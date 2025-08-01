@@ -18,7 +18,7 @@ Each configuration file defines the following model types:
 2. **Code Model** - Specialized model for code generation and technical tasks
 3. **Embedding Model** - Model for vector operations and semantic search
 4. **Reranking Model** - Model for search result optimization
-5. **Small Model** - Fast, lightweight model for quick tasks
+5. **Fast Model** - Fast, lightweight model for quick tasks
 
 ## Default Models
 
@@ -27,14 +27,14 @@ Each configuration file defines the following model types:
 - Code: `mychen76/qwen3_cline_roocode`
 - Embedding: `dengcao/Qwen3-Embedding-8B:Q5_K_M`
 - Reranking: `dengcao/Qwen3-Reranker-8B:Q5_K_M`
-- Small: `mistral:7b-instruct-q8_0`
+- Fast: `mistral:7b-instruct-q8_0`
 
 ### Linux Platform (NVIDIA GPU)
 - Primary: `Llama4:Scout`
 - Code: `codellama:34b`
 - Embedding: `jeffh/intfloat-e5-base-v2:f16`
 - Reranking: `jeffh/intfloat-e5-base-v2:f16`
-- Small: `mistral:7b-instruct-q8_0`
+- Fast: `mistral:7b-instruct-q8_0`
 
 ## Customizing Models
 
@@ -116,7 +116,7 @@ The configuration also supports model aliases for easier reference in applicatio
 - `code` → Code model
 - `embedding` → Embedding model
 - `reranking` → Reranking model
-- `small` → Small model
+- `fast` → Fast model
 
 ## Notes
 

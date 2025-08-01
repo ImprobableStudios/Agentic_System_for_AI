@@ -143,7 +143,7 @@ clean_environment() {
 
     # Delete data directories
     log_info "Deleting data directories..."
-    rm -rf "${SCRIPT_DIR}/data"
+    sudo rm -rf "${SCRIPT_DIR}/data"
 
     log_success "Environment cleaned successfully"
 }
@@ -659,6 +659,7 @@ generate_litellm_config() {
         -e "s|{{EMBEDDING_MODEL}}|${EMBEDDING_MODEL}|g" \
         -e "s|{{RERANKING_MODEL}}|${RERANKING_MODEL}|g" \
         -e "s|{{SMALL_MODEL}}|${SMALL_MODEL}|g" \
+        -e "s|{{LITELLM_MASTER_KEY}}|${LITELLM_MASTER_KEY}|g" \
         "$template" > "$output"
 
     log_success "LiteLLM configuration generated successfully"
@@ -703,7 +704,7 @@ create_directories() {
         log_success "Created directory: $dir"
     done
 
-    # Set appropriate permissions
+    # Set appropriate permissions - containers will modify as needed
     sudo chmod -R 777 "data/"
     
     log_success "Data directories created"
@@ -747,9 +748,13 @@ generate_secrets() {
     sed -i.bak "s|CHANGE_ME_SEARXNG_SECRET|$searxng_secret|g" .env
     sed -i.bak "s|CHANGE_ME_GRAFANA_SECRET|$grafana_secret|g" .env
 
-    sed -i.bak "s|CHANGE_ME_HTPASSWD_HASH|$admin_hash|g" .env
-    sed -i.bak "s|CHANGE_ME_PROMETHEUS_HTPASSWD|$admin_hash|g" .env
-    sed -i.bak "s|CHANGE_ME_ALERTMANAGER_HTPASSWD|$admin_hash|g" .env
+    sed -i.bak "s|CHANGE_ME_ADMIN_HASH|$admin_hash|g" .env
+    sed -i.bak "s|CHANGE_ME_PROMETHEUS_HASH|$admin_hash|g" .env
+    sed -i.bak "s|CHANGE_ME_ALERTMANAGER_HASH|$admin_hash|g" .env
+    sed -i.bak "s|CHANGE_ME_QDRANT_HASH|$admin_hash|g" .env
+
+    # Make available to other functions
+    export LITELLM_MASTER_KEY=$litellm_key
 
     # Generate MODEL_FILTER_LIST from configuration
     local model_filter_list=""
@@ -760,25 +765,12 @@ generate_secrets() {
             model_filter_list="${model_filter_list};${model}"
         fi
     done
-    sed -i.bak "s|GENERATED_BY_SETUP_SCRIPT|$model_filter_list|g" .env
+    sed -i.bak "s|CHANGE_ME_MODEL_FILTER_LIST|$model_filter_list|g" .env
 
     # Remove backup file created by sed
     if [ -f ".env.bak" ]; then
         rm .env.bak
     fi
-
-    # Generate DEFAULT_MODELS from aliases
-    local default_models=""
-    for i in "${!MODEL_ALIAS_KEYS[@]}"; do
-        local alias="${MODEL_ALIAS_KEYS[$i]}"
-        local model="${MODEL_ALIAS_VALUES[$i]}"
-        if [[ -z "$default_models" ]]; then
-            default_models="$model"
-        else
-            default_models="${default_models},${model}"
-        fi
-    done
-    echo "DEFAULT_MODELS=$default_models" >> .env
 
     # Create credentials file for reference
     cat > credentials.txt << EOF
@@ -897,6 +889,7 @@ display_final_info() {
     log_info "Service URLs (replace 'local' with your domain):"
     log_info "• Open WebUI: http://ai.local"
     log_info "• LiteLLM API: http://api.local"
+    log_info "• LiteLLM UI: http://api.local/ui"
     log_info "• n8n Workflow: http://n8n.local"
     log_info "• Qdrant (Vector Database): http://qdrant.local"
     log_info "• SearXNG (Search Engine): http://search.local"
@@ -913,7 +906,7 @@ display_final_info() {
     log_info "  - Code: $CODE_MODEL"
     log_info "  - Embedding: $EMBEDDING_MODEL"
     log_info "  - Reranking: $RERANKING_MODEL"
-    log_info "  - Small: $SMALL_MODEL"
+    log_info "  - Fast: $SMALL_MODEL"
     echo ""
     log_info "Management Commands:"
     log_info "• View logs: ${DOCKER_COMPOSE} logs -f [service_name]"
@@ -975,9 +968,9 @@ main() {
         setup_ollama
     fi
 
-    generate_litellm_config
     create_directories
     generate_secrets
+    generate_litellm_config
     prepare_docker_images
     start_services
     verify_installation
