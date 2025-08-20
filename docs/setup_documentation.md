@@ -76,11 +76,12 @@ The script will output a list of URLs for the various services. You can also fin
 
 | Service           | URL                     | Credentials                |
 | ----------------- | ----------------------- | -------------------------- |
-| Open WebUI        | http://localhost or http://ai.local | Create on first visit      |
+| Open WebUI        | http://ai.local         | Create on first visit      |
 | n8n               | http://n8n.local        | admin / your-password      |
 | Grafana           | http://grafana.local    | admin / your-password      |
 | Prometheus        | http://prometheus.local | admin / your-password      |
 | Traefik Dashboard | http://traefik.local    | admin / your-password      |
+| cAdvisor          | http://cadvisor.local   | No authentication required |
 | LiteLLM API       | http://localhost:4000   | API Key from `.env`        |
 
 ### Initial Configuration

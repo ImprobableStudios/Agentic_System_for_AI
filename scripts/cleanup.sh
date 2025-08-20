@@ -119,6 +119,22 @@ main() {
         log_warning "LiteLLM config file not found. Skipping."
     fi
 
+    if [ -f "${PROJECT_DIR}/.env" ]; then
+        log_info "Deleting .env file"
+        rm -f "${PROJECT_DIR}/.env"
+        log_success ".env file deleted."
+    else
+        log_warning ".env file not found. Skipping."
+    fi
+
+    if [ -f "${PROJECT_DIR}/credentials.txt" ]; then
+        log_info "Deleting credentials file"
+        rm -f "${PROJECT_DIR}/credentials.txt"
+        log_success "Credentials file deleted."
+    else
+        log_warning "Credentials file not found. Skipping."
+    fi
+
     log_success "Cleanup process completed."
 }
 

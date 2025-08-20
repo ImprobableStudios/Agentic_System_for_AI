@@ -39,6 +39,11 @@ The Agentic AI System includes a comprehensive monitoring stack built on industr
 - **Authentication**: Basic auth configured in .env
 - **Purpose**: Alert management and silencing
 
+### cAdvisor (Container Metrics)
+- **URL**: http://cadvisor.local
+- **Authentication**: No authentication required
+- **Purpose**: Real-time container resource usage and performance metrics
+
 ## Key Metrics to Monitor
 
 ### System Health Metrics

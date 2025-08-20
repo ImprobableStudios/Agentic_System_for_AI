@@ -32,6 +32,10 @@ This document provides a comprehensive overview of all ports exposed by the Dock
 - **Services with Traefik aliases** are accessible via the reverse proxy on ports 80/443 using the configured domain (i.e. `http://ai.local` or your custom domain)
 - **Services without exposed ports** are only accessible through Traefik routing
 - **All localhost-bound services (127.0.0.1)** are intended for internal access or SSH tunneling
+- **Local domain resolution**: To access services via `.local` domains, you need to either:
+  - Add entries to your system's `/etc/hosts` file (e.g., `127.0.0.1 cadvisor.local`)
+  - Use mDNS/Bonjour service discovery (available on macOS by default, requires Bonjour Print Services on Windows)
+  - Configure your router's DNS to resolve `.local` domains to your server's IP address
 
 ## Access Patterns
 
@@ -39,6 +43,17 @@ This document provides a comprehensive overview of all ports exposed by the Dock
 Services bound to `0.0.0.0` can be accessed directly:
 - HTTP/HTTPS traffic: `http://your-host:80` or `https://your-host:443`
 - LiteLLM API: `http://your-host:4000`
+- Monitoring Services:
+  - Grafana: `http://your-host:3000`
+  - Prometheus: `http://your-host:9090`
+  - AlertManager: `http://your-host:9093`
+  - cAdvisor: `http://your-host:8081`
+- Application Services:
+  - n8n: `http://your-host:5678`
+  - Qdrant: `http://your-host:6333`
+  - Open WebUI: `http://your-host:8082`
+  - SearXNG: `http://your-host:8083`
+  - Traefik Dashboard: `http://your-host:8080`
 
 ### Traefik Routed Access
 Services with Traefik aliases are accessed via domain names:
@@ -51,6 +66,26 @@ Services with Traefik aliases are accessed via domain names:
 ### Localhost Only
 Services bound to `127.0.0.1` require local access or SSH tunneling:
 ```bash
-# Example SSH tunnel for Grafana
-ssh -L 3000:localhost:3000 user@your-host
+# Example SSH tunnel for PostgreSQL
+ssh -L 5432:localhost:5432 user@your-host
+
+# Example SSH tunnel for Redis
+ssh -L 6379:localhost:6379 user@your-host
 ```
+
+## Service-Specific Access Examples
+
+### Container Monitoring (cAdvisor)
+cAdvisor provides real-time container resource usage and performance metrics:
+
+**Direct Access:**
+- `http://your-host:8081` - Direct access to cAdvisor UI
+
+**Traefik Routed Access:**
+- `http://cadvisor.local` - Access via reverse proxy (requires .local domain resolution)
+
+**Features Available:**
+- Real-time container CPU, memory, network, and filesystem usage
+- Historical resource usage graphs
+- Container process information
+- Docker container hierarchy view

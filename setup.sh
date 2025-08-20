@@ -707,6 +707,10 @@ create_directories() {
     # Set appropriate permissions - containers will modify as needed
     sudo chmod -R 777 "data/"
     
+    # Newer instances of PostgreSQL require stricter permissions
+    sudo chmod -R 700 "data/postgresql"
+    sudo chown -R 999:999 "data/postgresql"
+    
     log_success "Data directories created"
 }
 
@@ -733,7 +737,7 @@ generate_secrets() {
     local n8n_encryption_key=$(openssl rand -base64 32)
     local grafana_secret=$(openssl rand -base64 32)
 
-    # Generate htpasswd hashe
+    # Generate htpasswd hash
     local admin_hash=\'$(htpasswd -nb admin "$admin_password")\'
 
     # Replace placeholders in .env file
@@ -772,6 +776,10 @@ generate_secrets() {
         rm .env.bak
     fi
 
+    # Source .env to get the configured domain name
+    source .env
+    local domain_name="${DOMAIN_NAME:-local}"
+
     # Create credentials file for reference
     cat > credentials.txt << EOF
 =============================================================================
@@ -791,10 +799,26 @@ ADMIN CREDENTIALS:
 API KEYS:
 - LiteLLM Master Key: $litellm_key
 
+SERVICE URLS:
+- Open WebUI: http://ai.${domain_name}
+- LiteLLM API: http://api.${domain_name}
+- LiteLLM UI: http://api.${domain_name}/ui
+- n8n Workflow: http://n8n.${domain_name}
+- Qdrant (Vector Database): http://qdrant.${domain_name}
+- SearXNG (Search Engine): http://search.${domain_name}
+- Traefik Dashboard: http://traefik.${domain_name}
+- Grafana: http://grafana.${domain_name}
+- Prometheus: http://prometheus.${domain_name}
+- AlertManager: http://alertmanager.${domain_name}
+- cAdvisor (Container Metrics): http://cadvisor.${domain_name}
+
+NATIVE OLLAMA:
+- API: http://localhost:11434
+
 IMPORTANT: Store these credentials securely and delete this file after setup!
 =============================================================================
 EOF
-    
+
     chmod 600 credentials.txt
     log_success "Credentials generated and saved to credentials.txt"
     log_warning "Please store credentials securely and delete credentials.txt after setup"
@@ -877,6 +901,10 @@ verify_installation() {
 
 # Display final information
 display_final_info() {
+    # Source .env to get the configured domain name
+    source .env
+    local domain_name="${DOMAIN_NAME:-local}"
+
     log_success "==============================================================================="
     log_success "AGENTIC AI SYSTEM SETUP COMPLETED SUCCESSFULLY!"
     log_success "==============================================================================="
@@ -886,17 +914,18 @@ display_final_info() {
     log_info "• LiteLLM: Containerized, connecting to native Ollama via host.docker.internal:11434"
     log_info "• All other services: Containerized with Docker Compose"
     echo ""
-    log_info "Service URLs (replace 'local' with your domain):"
-    log_info "• Open WebUI: http://ai.local"
-    log_info "• LiteLLM API: http://api.local"
-    log_info "• LiteLLM UI: http://api.local/ui"
-    log_info "• n8n Workflow: http://n8n.local"
-    log_info "• Qdrant (Vector Database): http://qdrant.local"
-    log_info "• SearXNG (Search Engine): http://search.local"
-    log_info "• Traefik Dashboard: http://traefik.local"
-    log_info "• Grafana: http://grafana.local" 
-    log_info "• Prometheus: http://prometheus.local"
-    log_info "• AlertManager: http://alertmanager.local"
+    log_info "Service URLs (using configured domain: ${domain_name}):"
+    log_info "• Open WebUI: http://ai.${domain_name}"
+    log_info "• LiteLLM API: http://api.${domain_name}"
+    log_info "• LiteLLM UI: http://api.${domain_name}/ui"
+    log_info "• n8n Workflow: http://n8n.${domain_name}"
+    log_info "• Qdrant (Vector Database): http://qdrant.${domain_name}"
+    log_info "• SearXNG (Search Engine): http://search.${domain_name}"
+    log_info "• Traefik Dashboard: http://traefik.${domain_name}"
+    log_info "• Grafana: http://grafana.${domain_name}"
+    log_info "• Prometheus: http://prometheus.${domain_name}"
+    log_info "• AlertManager: http://alertmanager.${domain_name}"
+    log_info "• cAdvisor (Container Metrics): http://cadvisor.${domain_name}"
     echo ""
     log_info "Native Ollama:"
     log_info "• Service: Running natively via Homebrew"

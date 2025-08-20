@@ -31,7 +31,7 @@ services:
 
   # Core Database Services
   postgresql:
-    image: postgres:16-alpine
+    image: postgres:16-bullseye
     container_name: agentic-postgresql
     restart: unless-stopped
     environment:
@@ -42,6 +42,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     volumes:
+      # - postgresql-data:/var/lib/postgresql/data
       - ./data/postgresql:/var/lib/postgresql/data
       - ./config/postgresql/postgresql.conf:/etc/postgresql/postgresql.conf:ro
       - ./config/postgresql/init-scripts:/docker-entrypoint-initdb.d:ro
@@ -63,11 +64,12 @@ services:
           memory: 64G
 
   redis:
-    image: redis:7-alpine
+    image: redis:7-bullseye
     container_name: agentic-redis
     restart: unless-stopped
     command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
+      # - redis-data:/data
       - ./data/redis:/data
       - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
@@ -111,7 +113,7 @@ services:
       - "4000:4000"
       - "127.0.0.1:4001:4001"  # Prometheus metrics port
     extra_hosts:
-      - "host.docker.internal:172.17.0.1"
+      - "host.docker.internal:host-gateway"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.litellm.rule=Host(`api.${DOMAIN_NAME:-local}`) || PathPrefix(`/v1/`)"
@@ -226,6 +228,8 @@ services:
       - agentic-ai-backend
       - agentic-ai-data
       - agentic-ai-frontend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "5678:5678"
     labels:
@@ -269,6 +273,8 @@ services:
     networks:
       - agentic-ai-backend
       - agentic-ai-data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgresql:
         condition: service_healthy
@@ -305,7 +311,7 @@ services:
     ports:
       - "8082:8080"
     extra_hosts:
-      - "host.docker.internal:172.17.0.1"
+      - "host.docker.internal:host-gateway"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.webui.rule=Host(`ai.${DOMAIN_NAME:-local}`) || Host(`${DOMAIN_NAME:-localhost}`)"
@@ -350,7 +356,7 @@ services:
     ports:
       - "9090:9090"
     extra_hosts:
-      - "host.docker.internal:172.17.0.1"
+      - "host.docker.internal:host-gateway"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN_NAME:-local}`)"
@@ -617,7 +623,7 @@ services:
   #     - agentic-ai-data
   #     - agentic-ai-backend
   #   extra_hosts:
-  #     - "host.docker.internal:172.17.0.1"
+  #     - "host.docker.internal:host-gateway"
 
 networks:
   agentic-ai-backend:
@@ -642,3 +648,9 @@ networks:
     ipam:
       config:
         - subnet: 172.23.0.0/16
+
+#volumes:
+#  postgresql-data:
+#    driver: local
+#  redis-data:
+#    driver: local
