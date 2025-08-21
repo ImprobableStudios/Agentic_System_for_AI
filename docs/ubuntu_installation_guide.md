@@ -61,6 +61,20 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
+**Alternative: Using Remote Ollama**
+
+If you have Ollama running on another machine (such as a dedicated GPU server), you can configure the system to use it remotely:
+
+```bash
+# Use remote Ollama instance
+./setup.sh --remote-ollama 192.168.1.100:11434
+```
+
+This approach is useful for:
+- Sharing a powerful GPU server across multiple client machines
+- Running the system on machines without GPU capabilities
+- Centralized model management
+
 The script will prompt you for `sudo` access at various points to install system-level packages.
 
 The script will automatically:
@@ -239,12 +253,26 @@ dmesg | grep -i nvidia
    ```
 
 2. **Ollama GPU Issues**
+   
+   **For Local Ollama:**
    ```bash
    # Check Ollama GPU usage
    curl http://localhost:11434/api/ps
 
    # Restart Ollama service
    sudo systemctl restart ollama
+   ```
+   
+   **For Remote Ollama:**
+   ```bash
+   # Check remote Ollama GPU usage
+   curl http://REMOTE_IP:11434/api/ps
+   
+   # Check connectivity
+   ping REMOTE_IP
+   
+   # Check remote service (if you have SSH access)
+   ssh user@REMOTE_IP "sudo systemctl status ollama"
    ```
 
 3. **Out of Memory Errors**

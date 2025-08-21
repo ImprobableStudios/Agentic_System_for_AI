@@ -42,11 +42,18 @@ You can customize the script's behavior with the following arguments:
 -   `--dev-mode`: Runs the setup in development mode with debug logging.
 -   `--skip-prereqs`: Skips the prerequisite checks (for re-runs).
 -   `--clean`: Stops and removes all running containers and deletes the data directories before starting the setup.
+-   `--remote-ollama HOST:PORT`: Use an existing remote Ollama instance instead of installing locally.
 
-Example:
+Examples:
 ```bash
 # Run setup in development mode and skip prerequisite checks
 ./setup.sh --dev-mode --skip-prereqs
+
+# Use a remote Ollama instance
+./setup.sh --remote-ollama 192.168.1.100:11434
+
+# Combine options
+./setup.sh --skip-prereqs --remote-ollama 10.0.0.50:11434
 ```
 
 ## Post-Installation
@@ -160,11 +167,84 @@ docker-compose up -d
 
 **Note:** This service is optional and primarily useful for local network service discovery.
 
+## Remote Ollama Configuration
+
+The system supports using a remote Ollama instance instead of installing Ollama locally. This is useful when:
+
+- You have a dedicated GPU server running Ollama
+- You want to share Ollama across multiple client machines
+- You're running the system on a machine without GPU capabilities
+
+### Prerequisites for Remote Ollama
+
+1. **Remote Ollama Setup**: Ensure Ollama is running on the remote machine
+2. **Network Access**: The remote Ollama instance must be accessible from the client machine
+3. **Firewall Configuration**: Port 11434 must be open on the remote machine
+4. **Model Availability**: Required models should be available on the remote instance
+
+### Configuration Steps
+
+1. **Use the remote-ollama flag:**
+   ```bash
+   ./setup.sh --remote-ollama 192.168.1.100:11434
+   ```
+
+2. **Verify connectivity:**
+   ```bash
+   # Test remote Ollama before setup
+   curl http://192.168.1.100:11434/api/tags
+   ```
+
+3. **Check models:**
+   ```bash
+   # List available models on remote instance
+   curl http://192.168.1.100:11434/api/tags | jq '.models[].name'
+   ```
+
+### Remote Ollama Server Setup
+
+On the remote machine running Ollama:
+
+1. **Configure Ollama to accept external connections:**
+   ```bash
+   # Set environment variable
+   export OLLAMA_HOST=0.0.0.0:11434
+   
+   # Or for systemd service
+   sudo systemctl edit ollama
+   # Add:
+   [Service]
+   Environment="OLLAMA_HOST=0.0.0.0:11434"
+   
+   sudo systemctl daemon-reload
+   sudo systemctl restart ollama
+   ```
+
+2. **Configure firewall:**
+   ```bash
+   # Ubuntu/Linux
+   sudo ufw allow 11434
+   
+   # Or iptables
+   sudo iptables -A INPUT -p tcp --dport 11434 -j ACCEPT
+   ```
+
+### Differences from Local Setup
+
+When using remote Ollama:
+- Local Ollama installation is skipped
+- Docker containers connect directly to the remote IP
+- Model pulling is done via API calls to the remote instance
+- No `host.docker.internal` mapping is used
+- Health checks target the remote instance
+
 ## Troubleshooting
 
 ### Common Issues
 
 #### 1. Ollama Connection Failed
+
+**For Local Ollama:**
 ```bash
 # Check Ollama is running
 brew services list | grep ollama
@@ -174,6 +254,18 @@ brew services restart ollama
 
 # Check Ollama logs
 tail -f ~/.ollama/logs/server.log
+```
+
+**For Remote Ollama:**
+```bash
+# Test remote Ollama connectivity
+curl http://REMOTE_IP:11434/api/tags
+
+# Check network connectivity
+ping REMOTE_IP
+
+# Verify remote Ollama is running
+ssh user@REMOTE_IP "systemctl status ollama"
 ```
 
 #### 2. Container Won't Start

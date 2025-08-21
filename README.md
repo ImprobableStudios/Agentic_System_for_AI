@@ -42,6 +42,12 @@ A production-ready, hybrid AI platform combining native Ollama for maximum GPU p
    ./setup.sh
    ```
 
+   **For remote Ollama setup:**
+   If you have an existing Ollama instance running on another machine, you can use it instead of installing locally:
+   ```bash
+   ./setup.sh --remote-ollama 192.168.1.100:11434
+   ```
+
 3. **Access the services:**
    Once the setup is complete, you can access the various services via their respective URLs (e.g., `http://ai.local`, `http://n8n.local`). Refer to the `credentials.txt` file for initial login details.
 
@@ -56,6 +62,7 @@ The system is highly configurable via the `.env` file and the configuration file
 ## Architecture
 The system uses a hybrid architecture:
 - **Native Ollama**: Runs directly on the host OS to leverage maximum GPU performance for model inference.
+- **Remote Ollama**: Alternatively, connect to an existing Ollama instance running on another machine.
 - **Dockerized Services**: All other components (databases, monitoring, applications) are containerized for portability and easy management.
 
 For a detailed architecture overview, see `docs/architecture_evaluation.md`.
@@ -99,10 +106,25 @@ The system uses a hybrid approach for optimal performance:
 └─────────────────────────────────────────────────────┘
 ```
 
+### Remote Ollama Architecture
+```
+┌─────────────────────────────────────────────────────┐
+│               Client Machine                        │
+│                                                     │
+│  Docker Services          ←→  Remote Ollama         │
+│  - LiteLLM Gateway              (192.168.1.100)     │
+│  - Open WebUI                                       │
+│  - PostgreSQL                                       │
+│  - Redis                                            │
+│  - Qdrant                                           │
+│  - Monitoring Stack                                 │
+└─────────────────────────────────────────────────────┘
+```
+
 ## 📦 Components
 
 ### AI Services
-- **Ollama**: Native GPU inference engine (Metal for Mac, CUDA for NVIDIA)
+- **Ollama**: Native GPU inference engine (Metal for Mac, CUDA for NVIDIA) or remote instance
 - **LiteLLM**: Unified API gateway with caching
 - **Open WebUI**: Modern chat interface
 - **Qdrant**: Vector database for embeddings

@@ -13,12 +13,13 @@
 #
 # For detailed instructions, refer to the setup documentation in the 'docs' directory.
 #
-# Usage: ./setup.sh [--skip-prereqs] [--dev-mode] [--clean] [--help]
+# Usage: ./setup.sh [--skip-prereqs] [--dev-mode] [--clean] [--remote-ollama HOST:PORT] [--help]
 #
 # Options:
 #   --skip-prereqs  Skip prerequisite installation (useful for re-runs)
 #   --dev-mode      Enable development mode with debug logging
 #   --clean         Remove all data and containers before setup
+#   --remote-ollama Use remote Ollama instance (e.g., --remote-ollama 1.2.3.4:11434)
 #   --help          Show this help message
 # =============================================================================
 
@@ -98,6 +99,7 @@ load_model_config() {
 SKIP_PREREQS=false
 DEV_MODE=false
 CLEAN_MODE=false
+REMOTE_OLLAMA=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -112,6 +114,16 @@ while [[ $# -gt 0 ]]; do
         --clean)
             CLEAN_MODE=true
             shift
+            ;;
+        --remote-ollama)
+            if [[ -n "${2:-}" ]]; then
+                REMOTE_OLLAMA="$2"
+                shift 2
+            else
+                echo "Error: --remote-ollama requires a HOST:PORT argument"
+                show_help
+                exit 1
+            fi
             ;;
         --help)
             show_help
@@ -359,7 +371,11 @@ install_prerequisites_macos() {
         fi
     done
 
-    setup_colima
+    if [[ -n "$REMOTE_OLLAMA" ]]; then
+        log_info "Skipping Colima setup as remote Ollama is configured"
+    else
+        setup_colima
+    fi
 
     log_success "macOS prerequisites installed successfully"
 }
@@ -502,10 +518,20 @@ pull_models() {
 
     for model in "${MODELS_TO_PULL[@]}"; do
         log_info "Pulling model: $model"
-        if ollama pull "$model"; then
-            log_success "Successfully pulled $model"
+        if [[ -n "$REMOTE_OLLAMA" ]]; then
+            # Use curl to pull models on remote Ollama instance
+            if curl -s -X POST "http://${REMOTE_OLLAMA}/api/pull" -d "{\"name\":\"$model\"}" -H "Content-Type: application/json" > /dev/null; then
+                log_success "Successfully requested pull for $model on remote Ollama"
+            else
+                log_warning "Failed to pull $model on remote Ollama, continuing..."
+            fi
         else
-            log_warning "Failed to pull $model, continuing..."
+            # Use local ollama command
+            if ollama pull "$model"; then
+                log_success "Successfully pulled $model"
+            else
+                log_warning "Failed to pull $model, continuing..."
+            fi
         fi
     done
 
@@ -513,7 +539,14 @@ pull_models() {
     log_info "Verifying installed models..."
     local all_models_found=true
     local installed_models
-    installed_models=$(ollama list)
+    
+    if [[ -n "$REMOTE_OLLAMA" ]]; then
+        # Check remote Ollama instance
+        installed_models=$(curl -s "http://${REMOTE_OLLAMA}/api/tags" | grep -o '"name":"[^"]*"' | cut -d'"' -f4 || echo "")
+    else
+        # Check local Ollama instance
+        installed_models=$(ollama list)
+    fi
 
     for model in "${MODELS_TO_PULL[@]}"; do
         # Check if the model name from config is present in the 'ollama list' output.
@@ -625,7 +658,9 @@ EOF
 
 # Dispatcher function for Ollama setup
 setup_ollama() {
-    if [[ "$PLATFORM" == "macos" ]]; then
+    if [[ -n "$REMOTE_OLLAMA" ]]; then
+        setup_ollama_remote
+    elif [[ "$PLATFORM" == "macos" ]]; then
         setup_ollama_macos
     elif [[ "$PLATFORM" == "ubuntu" ]]; then
         setup_ollama_ubuntu
@@ -633,6 +668,35 @@ setup_ollama() {
         log_error "Ollama setup not supported on this platform: $PLATFORM"
         exit 1
     fi
+}
+
+# Setup for remote Ollama instance
+setup_ollama_remote() {
+    log_info "Configuring for remote Ollama instance at $REMOTE_OLLAMA..."
+    
+    # Verify remote Ollama is accessible
+    log_info "Testing connection to remote Ollama..."
+    local max_attempts=10
+    local attempt=1
+
+    while [[ $attempt -le $max_attempts ]]; do
+        if curl -s "http://${REMOTE_OLLAMA}/api/tags" > /dev/null 2>&1; then
+            log_success "Remote Ollama is accessible at $REMOTE_OLLAMA"
+            break
+        fi
+
+        if [[ $attempt -eq $max_attempts ]]; then
+            error_exit "Remote Ollama is not accessible at $REMOTE_OLLAMA after $max_attempts attempts"
+        fi
+
+        log_info "Attempt $attempt/$max_attempts: Testing connection to $REMOTE_OLLAMA..."
+        sleep 2
+        ((attempt++))
+    done
+
+    pull_models
+
+    log_success "Remote Ollama setup completed"
 }
 
 # Generate LiteLLM configuration from template
@@ -653,6 +717,14 @@ generate_litellm_config() {
         log_info "Backed up existing config to ${output}.backup"
     fi
 
+    # Determine Ollama host URL based on remote/local setup
+    local ollama_host
+    if [[ -n "$REMOTE_OLLAMA" ]]; then
+        ollama_host="http://${REMOTE_OLLAMA}"
+    else
+        ollama_host="http://host.docker.internal:11434"
+    fi
+
     # Replace template variables with model configuration
     sed -e "s|{{PRIMARY_MODEL}}|${PRIMARY_MODEL}|g" \
         -e "s|{{CODE_MODEL}}|${CODE_MODEL}|g" \
@@ -660,6 +732,7 @@ generate_litellm_config() {
         -e "s|{{RERANKING_MODEL}}|${RERANKING_MODEL}|g" \
         -e "s|{{SMALL_MODEL}}|${SMALL_MODEL}|g" \
         -e "s|{{LITELLM_MASTER_KEY}}|${LITELLM_MASTER_KEY}|g" \
+        -e "s|{{OLLAMA_API_BASE}}|${ollama_host}|g" \
         "$template" > "$output"
 
     log_success "LiteLLM configuration generated successfully"
@@ -756,6 +829,11 @@ generate_secrets() {
     sed -i.bak "s|CHANGE_ME_PROMETHEUS_HASH|$admin_hash|g" .env
     sed -i.bak "s|CHANGE_ME_ALERTMANAGER_HASH|$admin_hash|g" .env
     sed -i.bak "s|CHANGE_ME_QDRANT_HASH|$admin_hash|g" .env
+
+    # Set OLLAMA_HOST based on remote/local setup
+    if [[ -n "$REMOTE_OLLAMA" ]]; then
+        sed -i.bak "s|OLLAMA_HOST=|OLLAMA_HOST=$REMOTE_OLLAMA|g" .env
+    fi
 
     # Make available to other functions
     export LITELLM_MASTER_KEY=$litellm_key
@@ -869,11 +947,19 @@ start_services() {
 verify_installation() {
     log_info "Verifying installation..."
     
-    # Check native Ollama
-    if curl -s http://localhost:11434/api/tags > /dev/null; then
-        log_success "✓ Native Ollama is running"
+    # Check Ollama (local or remote)
+    if [[ -n "$REMOTE_OLLAMA" ]]; then
+        if curl -s "http://${REMOTE_OLLAMA}/api/tags" > /dev/null; then
+            log_success "✓ Remote Ollama is accessible at $REMOTE_OLLAMA"
+        else
+            log_error "✗ Remote Ollama is not responding at $REMOTE_OLLAMA"
+        fi
     else
-        log_error "✗ Native Ollama is not responding"
+        if curl -s http://localhost:11434/api/tags > /dev/null; then
+            log_success "✓ Native Ollama is running"
+        else
+            log_error "✗ Native Ollama is not responding"
+        fi
     fi
     
     # Check Docker services
@@ -887,13 +973,21 @@ verify_installation() {
         fi
     done
     
-    # Test LiteLLM connection to native Ollama
-    log_info "Testing LiteLLM connection to native Ollama..."
+    # Test LiteLLM connection to Ollama
+    log_info "Testing LiteLLM connection to Ollama..."
     sleep 10
-    if ${DOCKER_COMPOSE} exec -T litellm curl -s http://host.docker.internal:11434/api/tags > /dev/null; then
-        log_success "✓ LiteLLM can connect to native Ollama"
+    if [[ -n "$REMOTE_OLLAMA" ]]; then
+        if ${DOCKER_COMPOSE} exec -T litellm curl -s "http://${REMOTE_OLLAMA}/api/tags" > /dev/null; then
+            log_success "✓ LiteLLM can connect to remote Ollama"
+        else
+            log_error "✗ LiteLLM cannot connect to remote Ollama"
+        fi
     else
-        log_warning "⚠ LiteLLM connection to native Ollama needs verification"
+        if ${DOCKER_COMPOSE} exec -T litellm curl -s http://host.docker.internal:11434/api/tags > /dev/null; then
+            log_success "✓ LiteLLM can connect to native Ollama"
+        else
+            log_warning "⚠ LiteLLM connection to native Ollama needs verification"
+        fi
     fi
     
     log_success "Installation verification completed"
@@ -910,8 +1004,13 @@ display_final_info() {
     log_success "==============================================================================="
     echo ""
     log_info "Architecture Overview:"
-    log_info "• Native Ollama: Running on host at localhost:11434"
-    log_info "• LiteLLM: Containerized, connecting to native Ollama via host.docker.internal:11434"
+    if [[ -n "$REMOTE_OLLAMA" ]]; then
+        log_info "• Remote Ollama: Running at $REMOTE_OLLAMA"
+        log_info "• LiteLLM: Containerized, connecting to remote Ollama at $REMOTE_OLLAMA"
+    else
+        log_info "• Native Ollama: Running on host at localhost:11434"
+        log_info "• LiteLLM: Containerized, connecting to native Ollama via host.docker.internal:11434"
+    fi
     log_info "• All other services: Containerized with Docker Compose"
     echo ""
     log_info "Service URLs (using configured domain: ${domain_name}):"
@@ -927,9 +1026,15 @@ display_final_info() {
     log_info "• AlertManager: http://alertmanager.${domain_name}"
     log_info "• cAdvisor (Container Metrics): http://cadvisor.${domain_name}"
     echo ""
-    log_info "Native Ollama:"
-    log_info "• Service: Running natively via Homebrew"
-    log_info "• API: http://localhost:11434"
+    if [[ -n "$REMOTE_OLLAMA" ]]; then
+        log_info "Remote Ollama:"
+        log_info "• Service: Running at $REMOTE_OLLAMA"
+        log_info "• API: http://$REMOTE_OLLAMA"
+    else
+        log_info "Native Ollama:"
+        log_info "• Service: Running natively via Homebrew"
+        log_info "• API: http://localhost:11434"
+    fi
     log_info "• Models loaded from: $MODEL_CONFIG"
     log_info "  - Primary: $PRIMARY_MODEL"
     log_info "  - Code: $CODE_MODEL"
@@ -941,14 +1046,20 @@ display_final_info() {
     log_info "• View logs: ${DOCKER_COMPOSE} logs -f [service_name]"
     log_info "• Restart services: ${DOCKER_COMPOSE} restart"
     log_info "• Stop all: ${DOCKER_COMPOSE} down"
-    log_info "• Restart Ollama: brew services restart ollama"
-    log_info "• Check Ollama: ollama list"
+    if [[ -n "$REMOTE_OLLAMA" ]]; then
+        log_info "• Check Remote Ollama: curl http://$REMOTE_OLLAMA/api/tags"
+    else
+        log_info "• Restart Ollama: brew services restart ollama"
+        log_info "• Check Ollama: ollama list"
+    fi
     echo ""
     log_warning "IMPORTANT:"
     log_warning "• Credentials are saved in credentials.txt - store securely and delete after setup"
     log_warning "• Configure your domain in .env file for production use"
     log_warning "• Set up Tailscale for secure remote access"
-    log_warning "• Native Ollama runs independently of Docker containers"
+    if [[ -z "$REMOTE_OLLAMA" ]]; then
+        log_warning "• Native Ollama runs independently of Docker containers"
+    fi
     echo ""
     log_success "Setup completed! Your agentic AI system is ready to use."
 }
@@ -964,6 +1075,7 @@ Options:
     --skip-prereqs    Skip prerequisite installation (useful for re-runs)
     --dev-mode        Enable development mode with debug logging
     --clean           Remove all data and containers
+    --remote-ollama   Use remote Ollama instance (e.g., --remote-ollama 1.2.3.4:11434)
     --help            Show this help message
 
 This script will:

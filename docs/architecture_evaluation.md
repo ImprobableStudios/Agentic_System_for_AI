@@ -243,16 +243,48 @@ Containerized Services:
 
 ### 6.2 Horizontal Scaling Options
 - Additional Ollama instances on separate hosts
+- Remote Ollama deployment for shared GPU resources
 - Read replicas for PostgreSQL
 - Redis clustering for cache distribution
 - Load balancer configuration in Traefik
+
+### 6.3 Remote Ollama Architecture
+
+The system now supports connecting to remote Ollama instances, enabling new deployment patterns:
+
+#### Client-Server Model
+```
+┌─────────────────────────────┐    ┌──────────────────────────────┐
+│      Client Machine         │    │     GPU Server               │
+│                             │    │                              │
+│  ┌─────────────────────────┐│    │  ┌─────────────────────────┐ │
+│  │   Docker Services       ││    │  │     Native Ollama       │ │
+│  │   - LiteLLM Gateway     ││◄──►│  │   - Direct GPU Access   │ │
+│  │   - Open WebUI          ││    │  │   - CUDA/Metal          │ │
+│  │   - Databases           ││    │  │   - Model Storage       │ │
+│  │   - Monitoring          ││    │  └─────────────────────────┘ │
+│  └─────────────────────────┘│    └──────────────────────────────┘
+└─────────────────────────────┘
+```
+
+#### Benefits of Remote Ollama
+- **Resource Sharing**: Multiple client machines can share a powerful GPU server
+- **Cost Optimization**: Centralized GPU resources instead of per-machine GPUs
+- **Simplified Deployment**: Client machines only need Docker, no GPU requirements
+- **Model Management**: Centralized model storage and updates
+
+#### Usage
+```bash
+# Deploy with remote Ollama
+./setup.sh --remote-ollama 192.168.1.100:11434
+```
 
 ## 7. Known Limitations & Workarounds
 
 ### 7.1 Current Limitations
 - Open WebUI PostgreSQL integration temporarily disabled (bug #15300)
 - Single-host deployment (no built-in HA)
-- Manual Ollama management required
+- Manual Ollama management required (mitigated by remote Ollama support)
 - No automatic SSL certificate management
 
 ### 7.2 Planned Improvements
