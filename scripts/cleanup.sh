@@ -23,6 +23,10 @@ log_warning() {
     echo "[WARNING] $(date +"%Y-%m-%d %H:%M:%S") - $1"
 }
 
+log_error() {
+    echo "[ERROR] $(date +"%Y-%m-%d %H:%M:%S") - $1"
+}
+
 log_success() {
     echo "[SUCCESS] $(date +"%Y-%m-%d %H:%M:%S") - $1"
 }
@@ -34,15 +38,14 @@ check_os() {
         DOCKER_COMPOSE="docker-compose"
         log_success "Running on macOS"
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        # Linux detected - check if it's Ubuntu 24.04
+        # Linux detected - check if it's Debian-based (Debian/Ubuntu)
         if command -v lsb_release &> /dev/null; then
             DISTRO=$(lsb_release -si)
-            VERSION=$(lsb_release -sr)
-            if [[ "$DISTRO" == "Ubuntu" && "$VERSION" == "24.04" ]]; then
+            if [[ "$DISTRO" == "Ubuntu" || "$DISTRO" == "Debian" ]]; then
                 DOCKER_COMPOSE="sudo docker compose"
-                log_success "Running on Ubuntu 24.04"
+                log_success "Running on Linux ($DISTRO)"
             else
-                log_error "This script supports Ubuntu 24.04. Detected: $DISTRO $VERSION"
+                log_error "This script supports Debian-based systems (Ubuntu/Debian). Detected: $DISTRO"
                 echo ""
                 log_info "For other platforms, please check the documentation."
                 exit 1
@@ -51,17 +54,17 @@ check_os() {
             # Fallback check for Ubuntu without lsb_release
             if [[ -f /etc/os-release ]]; then
                 source /etc/os-release
-                if [[ "$ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]]; then
+                if [[ "$ID" == "ubuntu" || "$ID" == "debian" ]]; then
                     DOCKER_COMPOSE="sudo docker compose"
-                    log_success "Running on Ubuntu 24.04"
+                    log_success "Running on Linux"
                 else
-                    log_error "This script supports Ubuntu 24.04. Detected: $ID $VERSION_ID"
+                    log_error "This script supports Debian-based systems (Ubuntu/Debian). Detected: $ID"
                     echo ""
                     log_info "For other platforms, please check the documentation."
                     exit 1
                 fi
             else
-                log_error "Unable to determine Linux distribution. This script supports Ubuntu 24.04."
+                log_error "Unable to determine Linux distribution. This script supports Debian-based systems (Ubuntu/Debian)."
                 exit 1
             fi
         fi
@@ -70,7 +73,7 @@ check_os() {
         echo ""
         log_info "This script supports:"
         echo -e "${BLUE}  - macOS (Apple Silicon)${NC}"
-        echo -e "${BLUE}  - Ubuntu 24.04 (NVIDIA GPU)${NC}"
+        echo -e "${BLUE}  - Debian-based Linux (Ubuntu/Debian)${NC}"
         echo ""
         exit 1
     fi

@@ -4,10 +4,10 @@
 # Agentic AI System Setup Script
 # =============================================================================
 # This script sets up the complete agentic AI system for both macOS (Apple Silicon)
-# and Ubuntu (NVIDIA GPU) platforms. It automates the installation of prerequisites,
+# and Linux (NVIDIA GPU) platforms. It automates the installation of prerequisites,
 # configuration of services, and deployment of the entire stack.
 #
-# The script is designed to be idempotent, meaning it can be run multiple times
+# The script is designed to be idempotent, meaning it can be run multiple times"
 # without causing issues. It includes checks for existing installations and
 # provides options for cleaning the environment.
 #
@@ -95,11 +95,38 @@ load_model_config() {
     fi
 }
 
+# Show help
+show_help() {
+    cat <<EOF
+Agentic AI System Setup Script for MacOS
+
+Usage: $0 [OPTIONS]
+
+Options:
+    --skip-prereqs    Skip prerequisite installation (useful for re-runs)
+    --dev-mode        Enable development mode with debug logging
+    --clean           Remove all data and containers
+    --remote-ollama   Use remote Ollama instance (e.g., --remote-ollama 1.2.3.4:11434)
+    --admin-password  Set admin password (e.g., --admin-password MySecretPass)
+    --help            Show this help message
+
+This script will:
+    1. Install system prerequisites
+    2. Install and configure Ollama for GPU acceleration
+    3. Set up Docker containers for all services
+    4. Configure monitoring and security
+    5. Initialize AI models
+
+For more information, see docs/setup_documentation.md
+EOF
+}
+
 # Parse command line arguments
 SKIP_PREREQS=false
 DEV_MODE=false
 CLEAN_MODE=false
 REMOTE_OLLAMA=""
+ADMIN_PASSWORD=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -121,6 +148,16 @@ while [[ $# -gt 0 ]]; do
                 shift 2
             else
                 echo "Error: --remote-ollama requires a HOST:PORT argument"
+                show_help
+                exit 1
+            fi
+            ;;
+        --admin-password)
+            if [[ -n "${2:-}" ]]; then
+                ADMIN_PASSWORD="$2"
+                shift 2
+            else
+                echo "Error: --admin-password requires a password argument"
                 show_help
                 exit 1
             fi
@@ -165,46 +202,45 @@ check_os() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS detected
         PLATFORM="macos"
-        MODEL_CONFIG="${SCRIPT_DIR}/config/models-mac.conf"
+        MODEL_CONFIG="${SCRIPT_DIR}/config/models.conf"
         REQUIRED_MEMORY_GB=256
         REQUIRED_DISK_GB=500
         log_success "Running on macOS"
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        # Linux detected - check if it's Ubuntu 24.04
+        # Linux detected - check if it's Debian-based (Debian/Ubuntu)
         if command -v lsb_release &> /dev/null; then
             DISTRO=$(lsb_release -si)
-            VERSION=$(lsb_release -sr)
-            if [[ "$DISTRO" == "Ubuntu" && "$VERSION" == "24.04" ]]; then
-                PLATFORM="ubuntu"
-                MODEL_CONFIG="${SCRIPT_DIR}/config/models-linux.conf"
+            if [[ "$DISTRO" == "Ubuntu" || "$DISTRO" == "Debian" ]]; then
+                PLATFORM="linux"
+                MODEL_CONFIG="${SCRIPT_DIR}/config/models.conf"
                 REQUIRED_MEMORY_GB=64
                 REQUIRED_DISK_GB=1000
                 DOCKER_COMPOSE="sudo docker compose"
-                log_success "Running on Ubuntu 24.04"
+                log_success "Running on $DISTRO (Debian-based)"
             else
-                log_error "This script supports Ubuntu 24.04. Detected: $DISTRO $VERSION"
+                log_error "This script supports Debian-based systems (Ubuntu/Debian). Detected: $DISTRO"
                 echo ""
                 log_info "For other platforms, please check the documentation."
                 exit 1
             fi
         else
-            # Fallback check for Ubuntu without lsb_release
+            # Fallback check for /etc/os-release
             if [[ -f /etc/os-release ]]; then
                 source /etc/os-release
-                if [[ "$ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]]; then
-                    PLATFORM="ubuntu"
-                    MODEL_CONFIG="${SCRIPT_DIR}/config/models-linux.conf"
+                if [[ "$ID" == "ubuntu" || "$ID" == "debian" ]]; then
+                    PLATFORM="linux"
+                    MODEL_CONFIG="${SCRIPT_DIR}/config/models.conf"
                     REQUIRED_MEMORY_GB=64
                     REQUIRED_DISK_GB=1000
-                    log_success "Running on Ubuntu 24.04"
+                    log_success "Running on $ID (Debian-based)"
                 else
-                    log_error "This script supports Ubuntu 24.04. Detected: $ID $VERSION_ID"
+                    log_error "This script supports Debian-based systems (Ubuntu/Debian). Detected: $ID"
                     echo ""
                     log_info "For other platforms, please check the documentation."
                     exit 1
                 fi
             else
-                log_error "Unable to determine Linux distribution. This script supports Ubuntu 24.04."
+                log_error "Unable to determine Linux distribution. This script supports Debian-based systems (Ubuntu/Debian)."
                 exit 1
             fi
         fi
@@ -213,7 +249,7 @@ check_os() {
         echo ""
         log_info "This script supports:"
         echo -e "${BLUE}  - macOS (Apple Silicon)${NC}"
-        echo -e "${BLUE}  - Ubuntu 24.04 (NVIDIA GPU)${NC}"
+        echo -e "${BLUE}  - Debian-based Linux (Ubuntu/Debian)${NC}"
         echo ""
         exit 1
     fi
@@ -256,8 +292,8 @@ check_hardware() {
             log_warning "Intel Mac detected (some optimizations may not apply)"
         fi
 
-    elif [[ "$PLATFORM" == "ubuntu" ]]; then
-        # Ubuntu hardware checks
+    elif [[ "$PLATFORM" == "linux" ]]; then
+        # Linux hardware checks
         
         # Check memory
         local memory_gb=$(free -g | awk '/^Mem:/{print $2}')
@@ -371,16 +407,12 @@ install_prerequisites_macos() {
         fi
     done
 
-    if [[ -n "$REMOTE_OLLAMA" ]]; then
-        log_info "Skipping Colima setup as remote Ollama is configured"
-    else
-        setup_colima
-    fi
+    setup_colima
 
     log_success "macOS prerequisites installed successfully"
 }
 
-# Install NVIDIA drivers and CUDA toolkit for Ubuntu
+# Install NVIDIA drivers and CUDA toolkit for Linux
 install_nvidia_drivers() {
     log_info "Setting up NVIDIA GPU support..."
 
@@ -428,14 +460,14 @@ install_nvidia_drivers() {
     log_warning "Please reboot the system to ensure NVIDIA drivers are properly loaded"
 }
 
-# Install prerequisites for Ubuntu 24.04
-install_prerequisites_ubuntu() {
+# Install prerequisites for Linux
+install_prerequisites_linux() {
     if [[ "$SKIP_PREREQS" == "true" ]]; then
         log_info "Skipping prerequisite installation"
         return
     fi
 
-    log_info "Installing Ubuntu prerequisites..."
+    log_info "Installing Linux prerequisites..."
 
     # Update system
     log_info "Updating system packages..."
@@ -484,27 +516,31 @@ install_prerequisites_ubuntu() {
         log_success "Docker Compose already installed"
     fi
 
-    # Install Ollama for Ubuntu
-    if ! command -v ollama &> /dev/null; then
-        log_info "Installing Ollama..."
-        curl -fsSL https://ollama.ai/install.sh | sh
-        log_success "Ollama installed"
+    if [[ -n "$REMOTE_OLLAMA" ]]; then
+        log_info "Skipping Ollama setup as remote Ollama is configured"
     else
-        log_success "Ollama already installed"
+        # Install Ollama for Linux
+        if ! command -v ollama &> /dev/null; then
+            log_info "Installing Ollama..."
+            curl -fsSL https://ollama.ai/install.sh | sh
+            log_success "Ollama installed"
+        else
+            log_success "Ollama already installed"
+        fi
+
+        # Install NVIDIA drivers and CUDA
+        install_nvidia_drivers
     fi
 
-    # Install NVIDIA drivers and CUDA
-    install_nvidia_drivers
-
-    log_success "Ubuntu prerequisites installed successfully"
+    log_success "Linux prerequisites installed successfully"
 }
 
 # Platform-agnostic prerequisites installer
 install_prerequisites() {
     if [[ "$PLATFORM" == "macos" ]]; then
         install_prerequisites_macos
-    elif [[ "$PLATFORM" == "ubuntu" ]]; then
-        install_prerequisites_ubuntu
+    elif [[ "$PLATFORM" == "linux" ]]; then
+        install_prerequisites_linux
     else
         log_error "Unknown platform: $PLATFORM"
         exit 1
@@ -609,8 +645,8 @@ setup_ollama_macos() {
     log_success "Native Ollama setup for macOS completed"
 }
 
-setup_ollama_ubuntu() {
-    log_info "Setting up native Ollama for Ubuntu..."
+setup_ollama_linux() {
+    log_info "Setting up native Ollama for Linux..."
 
     # Add environment variables to ollama.service
     log_info "Adding environment variables to ollama.service..."
@@ -653,7 +689,7 @@ EOF
 
     pull_models
 
-    log_success "Native Ollama setup for Ubuntu completed"
+    log_success "Native Ollama setup for Linux completed"
 }
 
 # Dispatcher function for Ollama setup
@@ -662,8 +698,8 @@ setup_ollama() {
         setup_ollama_remote
     elif [[ "$PLATFORM" == "macos" ]]; then
         setup_ollama_macos
-    elif [[ "$PLATFORM" == "ubuntu" ]]; then
-        setup_ollama_ubuntu
+    elif [[ "$PLATFORM" == "linux" ]]; then
+        setup_ollama_linux
     else
         log_error "Ollama setup not supported on this platform: $PLATFORM"
         exit 1
@@ -800,7 +836,12 @@ generate_secrets() {
     cp .env.example .env
 
     # Generate passwords
-    local admin_password=$(openssl rand -hex 8)
+    local admin_password
+    if [[ -n "$ADMIN_PASSWORD" ]]; then
+        admin_password="$ADMIN_PASSWORD"
+    else
+        admin_password=$(openssl rand -hex 8)
+    fi
     local postgres_password=$(openssl rand -hex 16)
     local litellm_key=sk-$(openssl rand -hex 16)
 
@@ -1062,31 +1103,6 @@ display_final_info() {
     fi
     echo ""
     log_success "Setup completed! Your agentic AI system is ready to use."
-}
-
-# Show help
-show_help() {
-    cat <<EOF
-Agentic AI System Setup Script for MacOS
-
-Usage: $0 [OPTIONS]
-
-Options:
-    --skip-prereqs    Skip prerequisite installation (useful for re-runs)
-    --dev-mode        Enable development mode with debug logging
-    --clean           Remove all data and containers
-    --remote-ollama   Use remote Ollama instance (e.g., --remote-ollama 1.2.3.4:11434)
-    --help            Show this help message
-
-This script will:
-    1. Install system prerequisites
-    2. Install and configure Ollama for GPU acceleration
-    3. Set up Docker containers for all services
-    4. Configure monitoring and security
-    5. Initialize AI models
-
-For more information, see docs/setup_documentation.md
-EOF
 }
 
 # Main execution

@@ -5,9 +5,10 @@ This directory contains model configuration files for different platforms. The A
 
 ## Configuration Files
 
-- `models-mac.conf` - Model configuration for macOS/Apple Silicon platforms
-- `models-linux.conf` - Model configuration for Linux/NVIDIA GPU platforms
-- `models-4gb.conf` - **Lightweight model configuration for systems with limited VRAM (4GB or less)**
+- `models.conf` - Main model configuration file used by the setup script (default: identical to `models-4gb.conf`)
+- `models-4gb.conf` - Lightweight model configuration for systems with limited VRAM (4GB or more)
+- `models-96gb.conf` - Model configuration for systems with at least 96GB VRAM
+- `models-200gb.conf` - Model configuration for systems with at least 200GB VRAM
 - `litellm/config.yaml.template` - Template for LiteLLM configuration (processed during setup)
 
 ## Model Types
@@ -40,7 +41,10 @@ Each configuration file defines the following model types:
 
 To use different models:
 
-1. Edit the appropriate configuration file (`models-mac.conf` or `models-linux.conf`)
+1. Edit the configuration file (`models.conf`).
+2. For high-VRAM systems, copy the appropriate file:
+    - `cp models-96gb.conf models.conf`   # For 96GB+ VRAM systems
+    - `cp models-200gb.conf models.conf`  # For 200GB+ VRAM systems
 2. Update the model names for the desired model types
 3. Run the setup script - it will automatically:
    - Pull the configured models from Ollama
@@ -49,11 +53,11 @@ To use different models:
 
 ## Example Customization
 
-To change the primary model on Mac:
+To change the primary model:
 
 ```bash
-# Edit config/models-mac.conf
-PRIMARY_MODEL="llama3:70b"  # Change from default qwen3:235b-a22b
+# Edit config/models.conf
+PRIMARY_MODEL="llama3:70b"
 ```
 
 Then run the setup:
@@ -96,11 +100,7 @@ The `models-4gb.conf` file provides a lightweight model configuration designed f
 To use the 4GB configuration:
 
 ```bash
-# For Mac
-cp config/models-4gb.conf config/models-mac.conf
-
-# For Linux/NVIDIA
-cp config/models-4gb.conf config/models-linux.conf
+cp config/models-4gb.conf config/models.conf
 
 # Then run setup
 ./setup.sh

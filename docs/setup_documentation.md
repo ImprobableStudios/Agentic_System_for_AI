@@ -43,6 +43,7 @@ You can customize the script's behavior with the following arguments:
 -   `--skip-prereqs`: Skips the prerequisite checks (for re-runs).
 -   `--clean`: Stops and removes all running containers and deletes the data directories before starting the setup.
 -   `--remote-ollama HOST:PORT`: Use an existing remote Ollama instance instead of installing locally.
+-   `--admin-password PASSWORD`: Set the admin password manually (otherwise, a random password is generated).
 
 Examples:
 ```bash
@@ -52,8 +53,11 @@ Examples:
 # Use a remote Ollama instance
 ./setup.sh --remote-ollama 192.168.1.100:11434
 
+# Set admin password manually
+./setup.sh --admin-password MySecretPass
+
 # Combine options
-./setup.sh --skip-prereqs --remote-ollama 10.0.0.50:11434
+./setup.sh --skip-prereqs --remote-ollama 10.0.0.50:11434 --admin-password MySecretPass
 ```
 
 ## Post-Installation
@@ -127,8 +131,8 @@ The `docker-compose.yml` file defines all services:
 
 ### Service Configurations
 Configuration files are in the `config/` directory:
-- `models-mac.conf`: AI model definitions for Mac platform
-- `models-linux.conf`: AI model definitions for Linux platform
+- `models.conf`: Main model configuration file used by the setup script (default: identical to `models-4gb.conf`).
+   - For high-VRAM systems, use `models-96gb.conf` or `models-200gb.conf` as needed.
 - `traefik/`: Reverse proxy rules
 - `litellm/config.yaml`: Model configurations (generated from template)
 - `postgresql/postgresql.conf`: Database tuning

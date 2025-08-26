@@ -102,7 +102,12 @@ docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi
 
 ### 4. Model Configuration
 
-Models are automatically configured from `config/models-linux.conf` during setup:
+Models are automatically configured from `config/models.conf` during setup (default: identical to `models-4gb.conf`).
+For high-VRAM systems, copy the appropriate file:
+```bash
+cp config/models-96gb.conf config/models.conf   # For 96GB+ VRAM systems
+cp config/models-200gb.conf config/models.conf  # For 200GB+ VRAM systems
+```
 - **Primary Model**: General-purpose reasoning (default: Llama4:Scout)
 - **Code Model**: Code generation and analysis (default: codellama:34b)
 - **Embedding Model**: Vector operations (default: jeffh/intfloat-e5-base-v2:f16)
@@ -112,7 +117,7 @@ Models are automatically configured from `config/models-linux.conf` during setup
 To customize models before installation:
 ```bash
 # Edit the configuration file
-nano config/models-linux.conf
+nano config/models.conf
 
 # Example: Change primary model
 PRIMARY_MODEL="llama3.1:70b"

@@ -1,11 +1,11 @@
 # Agentic AI System
 
-A production-ready, hybrid AI platform combining native Ollama for maximum GPU performance with containerized services for enterprise-grade features. Supports both Mac Studio (Apple Silicon) and Ubuntu Server (NVIDIA GPU) deployments.
+A production-ready, hybrid AI platform combining native Ollama for maximum GPU performance with containerized services for enterprise-grade features. Supports both Mac Studio (Apple Silicon) and Linux Server (NVIDIA GPU) deployments.
 
 ## 🚀 Features
 
 - **Hybrid Architecture**: Native Ollama for GPU acceleration + Docker services for portability
-- **Multi-Platform Support**: Optimized for Mac Studio M3 Ultra and Ubuntu Server with NVIDIA GPUs
+- **Multi-Platform Support**: Optimized for Mac Studio M3 Ultra and Linux Server with NVIDIA GPUs
 - **Multiple AI Models**: Platform-specific models with easy customization via configuration files
 - **Enterprise Ready**: Full monitoring, security, authentication, and backup capabilities
 - **Workflow Automation**: Built-in n8n for complex AI agent workflows
@@ -15,16 +15,16 @@ A production-ready, hybrid AI platform combining native Ollama for maximum GPU p
 
 ## 📋 Prerequisites
 
-### Mac Studio / Ubuntu Server
-- **Operating System**: macOS 14+ (Sonoma) or Ubuntu 24.04 LTS
+### Mac Studio / Linux Server
+- **Operating System**: macOS 14+ (Sonoma) or Debian/Ubuntu Linux
 - **Memory**: 64GB RAM minimum (128GB+ recommended)
 - **Storage**: 1TB NVMe SSD minimum (2TB+ recommended)
 - **GPU**:
     - **Mac**: M1/M2/M3 Ultra with maximum GPU cores
-    - **Ubuntu**: NVIDIA RTX 3090 / 4090 or higher, with appropriate drivers
+    - **Linux**: NVIDIA RTX 3090 / 4090 or higher, with appropriate drivers
 - **Software**:
     - **macOS**: Homebrew, Docker Desktop with Colima
-    - **Ubuntu**: Docker, Docker Compose, NVIDIA Container Toolkit
+    - **Linux**: Docker, Docker Compose, NVIDIA Container Toolkit
 - **Connectivity**: Internet access for downloading models and dependencies
 
 ## 🚀 Quick Start
@@ -36,17 +36,23 @@ A production-ready, hybrid AI platform combining native Ollama for maximum GPU p
    ```
 
 2. **Run the setup script:**
-   This will install all prerequisites, configure the environment, and start all services.
-   ```bash
-   chmod +x setup.sh
-   ./setup.sh
-   ```
+  This will install all prerequisites, configure the environment, and start all services.
+  ```bash
+  chmod +x setup.sh
+  ./setup.sh
+  ```
 
-   **For remote Ollama setup:**
-   If you have an existing Ollama instance running on another machine, you can use it instead of installing locally:
-   ```bash
-   ./setup.sh --remote-ollama 192.168.1.100:11434
-   ```
+  **Set admin password manually:**
+  You can supply an admin password directly (instead of auto-generating):
+  ```bash
+  ./setup.sh --admin-password MySecretPass
+  ```
+
+  **For remote Ollama setup:**
+  If you have an existing Ollama instance running on another machine, you can use it instead of installing locally:
+  ```bash
+  ./setup.sh --remote-ollama 192.168.1.100:11434
+  ```
 
 3. **Access the services:**
    Once the setup is complete, you can access the various services via their respective URLs (e.g., `http://ai.local`, `http://n8n.local`). Refer to the `credentials.txt` file for initial login details.
@@ -55,7 +61,7 @@ A production-ready, hybrid AI platform combining native Ollama for maximum GPU p
 The system is highly configurable via the `.env` file and the configuration files in the `config` directory.
 
 - **`.env`**: Main environment variables, including domain names, passwords, and API keys.
-- **`config/models-mac.conf` / `config/models-linux.conf`**: Define the AI models to be used on each platform.
+- **`config/models.conf`**: Define the AI models to be used for all platforms.
 - **`config/litellm/config.yaml`**: LiteLLM configuration for model routing and fallbacks.
 - **`docker-compose.yml`**: Defines all the containerized services and their configurations.
 
@@ -90,10 +96,10 @@ The system uses a hybrid approach for optimal performance:
 └─────────────────────────────────────────────────────┘
 ```
 
-### Ubuntu Server Architecture
+### Linux Server Architecture
 ```
 ┌─────────────────────────────────────────────────────┐
-│              Ubuntu Server + NVIDIA GPU             │
+│              Linux Server + NVIDIA GPU              │
 │      RTX PRO 6000 Blackwell (96GB GDDR7)            │
 │                                                     │
 │  Native Ollama (CUDA)  ←→  Docker Services          │
@@ -161,18 +167,16 @@ Key configurations:
 
 ### Available Models
 
-Models are configured per platform in:
-- **Mac Studio**: `config/models-mac.conf`
-- **Ubuntu/NVIDIA**: `config/models-linux.conf`
 
-**Note:** The default model configurations are optimized for high-performance systems with large VRAM. For systems with limited resources (4GB VRAM or less), use the `config/models-4gb.conf` configuration, which provides lighter models suitable for testing and smaller deployments.
+Models are configured in a single file for all platforms:
+- **`config/models.conf`**: Main model configuration file used by the setup script.
+  - For high-VRAM systems, use `models-96gb.conf` or `models-200gb.conf` as needed.
 
-To switch to the 4GB configuration:
+**Note:** By default, `config/models.conf` is identical to `models-4gb.conf` and suitable for systems with limited VRAM (4GB or more). For high-performance systems, you may copy `models-96gb.conf` or `models-200gb.conf` to `models.conf`:
+
 ```bash
-# Copy the 4GB configuration
-cp config/models-4gb.conf config/models-mac.conf  # For Mac
-# or
-cp config/models-4gb.conf config/models-linux.conf  # For Ubuntu
+cp config/models-96gb.conf config/models.conf   # For 96GB+ VRAM systems
+cp config/models-200gb.conf config/models.conf  # For 200GB+ VRAM systems
 ```
 
 Each platform includes:
@@ -231,7 +235,7 @@ curl http://localhost:4000/v1/completions \
 sudo powermetrics --samplers gpu_power -i1000
 ```
 
-**Ubuntu Server**:
+**Linux Server**:
 ```bash
 # Real-time GPU monitoring
 nvidia-smi -l 1
@@ -250,7 +254,7 @@ nvtop
 
 - **Network Isolation**: Four separate Docker networks
 - **Authentication**: Service-level auth on all endpoints
-- **Firewall**: UFW configured (Ubuntu) / macOS firewall (Mac)
+- **Firewall**: UFW configured (Linux) / macOS firewall (Mac)
 - **Access Control**: Basic auth on admin interfaces
 - **Secrets Management**: Auto-generated, environment-based secure credentials
 
@@ -301,7 +305,7 @@ brew upgrade ollama
 
 - [Architecture Overview](docs/architecture_evaluation.md)
 - [Mac Setup Guide](docs/setup_documentation.md)
-- [Ubuntu Installation Guide](docs/ubuntu_installation_guide.md)
+- [Linux Installation Guide](docs/linux_installation_guide.md)
 - [Monitoring Guide](docs/monitoring_guide.md)
 
 ## 🐛 Troubleshooting
@@ -321,7 +325,7 @@ sudo ubuntu-drivers autoinstall
 # Mac
 brew services restart ollama
 
-# Ubuntu
+# Linux
 sudo systemctl restart ollama
 ```
 
